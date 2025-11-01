@@ -1,0 +1,645 @@
+/* ============================================================================
+   Product page styles (scoped to .product-page)
+   Author: Calista Verner
+   Part of Shopmatic
+   Version: 1.0.0
+   Date: 2025-10-24
+
+   Notes:
+   - Все стили изолированы внутри .product-page (оболочка).
+   - Медиа-запросы используют абсолютные значения (переменные CSS не поддерживаются
+     в медиазапросах в ряде браузеров), поэтому используются конкретные пиксели:
+       --break-sm: 720px  -> max-width: 719px
+       --break-md: 1100px -> max-width: 1099px, min-width: 1100px
+   - Стили стремятся быть доступными (focus-visible), отзывчивыми и компактными.
+   ============================================================================ */
+/* Scoped root */
+.product-page {
+    /* CSS variables scoped to .product-page (consumers can override at container level) */
+    --bg: #ffffff;
+    --bg-secondary: var(--bg);
+    --muted: #6c757d;
+    --accent: #ffd450;
+    --primary: #0d6efd;
+    --success: #118a4b;
+    --danger: #e03131;
+    --surface: #f8f9fa;
+    --card-shadow: 0 8px 28px rgba(16,24,40,0.06);
+    --radius: 12px;
+    --gap: 20px;
+    --gap-sm: 12px;
+    --break-sm: 720px;
+    /* informational only - not used in queries */
+    --break-md: 1100px;
+    /* informational only - not used in queries */
+    --text: #111827;
+    --muted-2: #9aa3ad;
+    --price-term: var(--success);
+    --control-primary-hover: #ffd86b;
+    --specs-gap: 12px;
+    --specs-title-color: #6b6b6b; /* цвет заголовка */
+    --specs-value-color: #111827; /* цвет значения */
+    --specs-line-color: rgba(17,24,39,0.08); /* базовая линия */
+    --specs-line-accent: rgba(49, 34, 12, 0.161);
+    --specs-font-size: 14px;
+    --specs-title-weight: 600;
+    --specs-radius: 6px;
+	
+	  --crumb-bg: rgba(255,255,255,0.04);
+  --crumb-bg-soft: rgba(255,255,255,0.02);
+  --crumb-border: rgba(0,0,0,0.06);
+
+  --text-primary: #1f2937;         /* темный текст (light theme) */
+  --muted: #6b7280;                /* muted text */
+  --accent: #0ea5a4;               /* primary accent (teal) */
+  --accent-weak: rgba(14,165,164,0.12);
+
+  --shadow-subtle: 0 1px 2px rgba(16,24,40,0.04);
+  --radius: 10px;
+
+  --font-size-small: 0.8125rem;    /* ~13px */
+  --gap: 8px;
+}
+
+/* ---------- Buybox (scoped) ---------- */
+.product-page .price-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.product-page .price-current {
+    color: var(--price-term);
+    letter-spacing: -.015em;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.product-page .price-old {
+    color: var(--muted);
+    text-decoration: line-through;
+    font-size: 12pt;
+}
+
+.product-page .discount-badge {
+    align-self: flex-start;
+    background: linear-gradient(180deg,#fff3c2,#fff0a8);
+    padding: .3rem .6rem;
+    border-radius: 8px;
+    font-weight: 700;
+    color: #b35a00;
+    font-size: .85rem;
+}
+
+/* availability/stock */
+.product-page .availability {
+    font-size: .95rem;
+    color: var(--muted);
+}
+
+.product-page .stock-count {
+    font-weight: 700;
+    color: var(--text);
+    margin-left: 6px;
+}
+
+/* buy buttons — grid so buttons stack nicely on small screens */
+.product-page .buy-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    height: 56px;
+}
+
+.product-page .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .6rem .9rem;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-weight: 700;
+    text-decoration: none;
+    user-select: none;
+    transition: transform .08s ease, box-shadow .12s ease, background-color .12s ease;
+}
+
+.product-page .btn:focus-visible {
+    outline: 3px solid rgba(13,110,253,0.12);
+    outline-offset: 2px;
+}
+
+.product-page .btn-primary {
+    background: var(--primary);
+    color: #fff;
+}
+
+.product-page .btn.btn-yellow {
+    background: var(--control-primary);
+    color: #111;
+}
+
+.product-page .btn.btn-yellow:hover {
+    background: var(--control-primary-hover);
+    color: #111;
+}
+
+.product-page .btn.btn-outline {
+    background: transparent;
+    border: 1px solid #e6e6e6;
+    color: var(--text);
+}
+
+.product-page .btn.btn-outline:hover {
+    color: var(--text);
+    transform: translateY(-1px);
+}
+
+/* buy-actions */
+.product-page .buy-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.product-page .fav-toggle, .product-page .wishlist-toggle {
+    padding: .5rem .7rem;
+    border-radius: 10px;
+    font-weight: 600;
+    border: 1px solid #eef2f6;
+    background: #fff;
+    cursor: pointer;
+    transition: box-shadow .12s ease, transform .06s ease;
+}
+
+.product-page .fav-toggle:focus-visible, .product-page .wishlist-toggle:focus-visible {
+    outline: 3px solid rgba(13,110,253,0.12);
+}
+
+/* delivery / seller */
+.product-page .delivery {
+    font-size: .95rem;
+    color: var(--muted);
+}
+
+.product-page .shop-info {
+    font-size: .9rem;
+    color: var(--muted);
+}
+
+/* ---------- Related products — grid (scoped) ---------- */
+.product-page .product-related {
+    margin-top: 18px;
+}
+
+.product-page .related-title {
+    font-size: 1.1rem;
+    margin: 0 0 10px 0;
+}
+
+.product-page .related-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+    align-items: start;
+}
+
+/* product layout: three-column on desktop */
+.product-page {
+    display: grid;
+    grid-template-columns: 451px 1fr 300px;
+    /* gallery | main | buybox */
+    gap: 20px;
+    align-items: start;
+    position: relative;
+}
+
+/* main info */
+.product-info {
+}
+
+.breadcrumbs {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 6px 0 12px 0;
+    display: block;
+}
+
+.product-title {
+    font-size: 28px;
+    margin: 6px 0 12px 0;
+    line-height: 1.08;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.product-meta {
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: var(--muted);
+    gap: 12px;
+    align-items: center;
+}
+
+.rating {
+    color: #ffb400;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rating .reviews-count {
+    color: var(--muted);
+    font-size: 13px;
+    margin-left: 6px;
+}
+
+.product-short {
+    color: var(--muted);
+    margin-top: 8px;
+}
+
+.product-variants {
+    margin-top: 12px;
+}
+
+.cart-item__info {
+    margin-top: 12px;
+}
+
+.cart-item__info .specsBlock {
+	width: 55%;
+}
+
+.specsEntry {
+  display: flex;
+  align-items: center;
+  gap: var(--specs-gap);
+  padding: 6px 0;
+  column-gap: 14px;
+  min-height: 38px;
+}
+
+/* Заголовок (непереносимый, если нужно) */
+.specsTitle {
+  color: var(--specs-title-color);
+  font-size: var(--specs-font-size);
+  font-weight: var(--specs-title-weight);
+  white-space: nowrap;            /* если нужно, чтобы заголовок не переносился */
+  flex: 0 0 auto;                 /* не растёт */
+  padding-right: 6px;
+  background: transparent;
+}
+
+/* Separator — гибкая линия между заголовком и значением */
+.specsEntry .separator {
+  flex: 1 1 auto;                 /* занимает доступное пространство */
+  height: 1px;
+  border-radius: var(--specs-radius);
+  background: var(--specs-line-accent); /* можно заменить на однотонный цвет */
+  opacity: 1;
+  min-width: 50px;
+}
+
+/* Значение — справа, можно переноситься, или зафиксировать ширину */
+.specsValue {
+  color: var(--specs-value-color);
+  font-size: var(--specs-font-size);
+  flex: 0 0 auto;                 /* не сжимается дальше содержимого */
+                   /* при желании фиксируем ширину колонки значения */
+  text-align: right;              /* выравнивание значения справа (как на маркетплейсах) */
+  word-break: break-word;
+  white-space: normal;
+}
+
+/* Мобильная подстройка: значение переходит под линию, если не помещается */
+@media (max-width: 720px) {
+  .specsEntry {
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .specsTitle { white-space: normal; }
+  .specsEntry .separator { order: 3; width: 100%; height: 1px; }
+  .specsValue { order: 4; text-align: left; max-width: 100%; }
+}
+
+/* buybox style */
+.product-buybox {
+    position: relative;
+    border-radius: 10px;
+}
+
+.buybox-card {
+    background: #fff;
+    padding: 18px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    width: 100%;
+    box-sizing: border-box;
+    position: sticky;
+    top: 20px;
+    border-radius: 10px;
+}
+
+.price-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.price-current {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--success);
+}
+
+.price-old {
+    font-size: 14px;
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+.availability {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+}
+
+.stock-label {
+    color: var(--muted);
+    margin-right: 6px;
+}
+
+.stock-count {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.buy-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    font-weight: 600;
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--text);
+}
+
+.btn-yellow {
+    background: linear-gradient(90deg,var(--accent), #f2b600);
+    color: var(--accent-contrast);
+    border: none;
+    box-shadow: 0 10px 28px rgba(242,182,0,0.12);
+}
+
+.buy-actions {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fav-toggle {
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+}
+
+/* related section (full width under grid) */
+.product-related {
+    grid-column: 1 / -1;
+    /* spans full width */
+    margin-top: 28px;
+}
+
+.related-title {
+    font-size: 16px;
+    margin: 6px 0 12px 0;
+}
+
+.related-list {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* product description */
+.product-description {
+    margin-top: 18px;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+/* small helpers */
+.small {
+    font-size: 12px;
+}
+
+.text-muted {
+    color: var(--muted);
+}
+
+.gallery-thumbs > button {
+	display: flex;
+}
+
+/* responsive */
+@media (max-width: 980px) {
+    .product-page {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .product-gallery {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .gallery-thumbs {
+        flex-direction: row;
+        order: 1;
+    }
+
+    .gallery-main {
+        order: 2;
+    }
+
+    .product-buybox {
+        order: 3;
+    }
+
+    .gallery-main .product-main-img {
+        height: 48vh;
+        border-radius: 10px;
+    }
+
+    .buybox-card {
+        position: relative;
+        top: auto;
+    }
+}
+
+@media (max-width: 560px) {
+    .gallery-thumbs button {
+        width:52px;
+        height: 52px;
+    }
+
+    .gallery-main .product-main-img {
+        height: 40vh;
+    }
+
+    .product-title {
+        font-size: 20px;
+    }
+}
+
+/* Основной контейнер */
+nav.breadcrumbs{
+  display: inline-flex;
+  align-items: center;
+  border-radius: calc(var(--radius) - 2px);
+  background: linear-gradient(180deg, var(--crumb-bg) 0%, var(--crumb-bg-soft) 100%);
+  box-shadow: var(--shadow-subtle);
+  border: 1px solid var(--crumb-border);
+  line-height: 1;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  transition: background 160ms ease, color 160ms ease, transform 120ms ease;
+}
+
+/* small modifier to reduce paddings if needed (keeps API from your HTML) */
+nav.breadcrumbs.small{
+  padding: 4px 8px;
+  gap: 6px;
+  font-size: 9pt;
+}
+
+/* individual crumb */
+nav.breadcrumbs .crumb{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+  max-width: 18ch;                /* ограничит очень длинные имена */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 160ms ease, background 160ms ease, transform 120ms ease;
+  cursor: default;
+  font-weight: 600;
+}
+
+/* Семантические классы для стилизации */
+nav.breadcrumbs .category{
+  color: var(--text-primary);
+  font-weight: 700;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 8px;
+}
+
+/* Название бренда — менее акцентированно */
+nav.breadcrumbs .brand{
+  color: var(--muted);
+  font-weight: 600;
+  padding: 6px 8px;
+}
+
+/* разделитель (если используется элемент .divider) */
+nav.breadcrumbs .divider{
+  color: var(--muted);
+  font-size: 0.9em;
+  opacity: 0.9;
+  margin: 0 2px;
+  user-select: none;
+}
+
+/* Если divider не в разметке — используем псевдоэлемент */
+nav.breadcrumbs .crumb + .crumb::before{
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 1px;
+  margin: 0 6px;
+  vertical-align: middle;
+  background: linear-gradient(90deg, transparent, var(--crumb-border), transparent);
+  border-radius: 1px;
+}
+
+/* hover/focus styles — для интерактивности (если элементы кликабельны) */
+nav.breadcrumbs .crumb[role="link"],
+nav.breadcrumbs .crumb.clickable {
+  cursor: pointer;
+  color: var(--text-primary);
+  background: rgba(0,0,0,0.02);
+}
+
+nav.breadcrumbs .crumb[role="link"]:hover,
+nav.breadcrumbs .crumb.clickable:hover,
+nav.breadcrumbs .crumb[role="link"]:focus,
+nav.breadcrumbs .crumb.clickable:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(16,24,40,0.06);
+  color: var(--accent);
+  outline: none;
+}
+
+/* Акцентная подсветка для бренда (например при выборе) */
+nav.breadcrumbs .brand.selected {
+  background: var(--accent-weak);
+  color: var(--accent);
+  border-radius: 8px;
+}
+
+/* Адаптив: на узких экранах сократить отступы и скрыть детали */
+@media (max-width: 460px){
+  nav.breadcrumbs{
+    padding: 4px 6px;
+    gap: 6px;
+    font-size: 0.75rem;
+  }
+  nav.breadcrumbs .crumb{
+    padding: 4px 6px;
+    max-width: 12ch;
+  }
+  nav.breadcrumbs .category{
+    font-size: 0.92em;
+  }
+  nav.breadcrumbs .brand{
+    display: none; /* если место критично — скрываем бренд на мобильных */
+  }
+}
+
+/* Удобство для печати — убрать фоны/тени */
+@media print {
+  nav.breadcrumbs{
+    background: transparent !important;
+    box-shadow:none !important;
+    border: none !important;
+    color: #000 !important;
+  }
+  nav.breadcrumbs .crumb{ background: transparent !important; color: #000 !important; }
+}

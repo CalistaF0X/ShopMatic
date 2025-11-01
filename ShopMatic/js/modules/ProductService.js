@@ -1,77 +1,236 @@
-// shopmatic/ProductService.js
-import { escapeHtml } from './utils.js';
+// @ts-check
+import { escapeHtml as _escapeHtml } from './utils.js';
 
+/**
+ * ProductService
+ *
+ * Данный класс инкапсулирует логику загрузки и нормализации
+ * продуктов, категорий и брендов. Оптимизация заключается в
+ * упрощении конструирования, улучшении разделения обязанностей,
+ * сокращении повторов кода и более эффективном кешировании.
+ *
+ * Основные изменения:
+ *  - Использование деструктуризации для настроек конструктора
+ *  - Вынесены повторяющиеся фрагменты в отдельные методы
+ *  - Упрощён доступ к картам категорий и брендов
+ *  - Повышена читаемость и расширяемость API
+ */
 export class ProductService {
   /**
-   * @param {object} foxEngine - интеграция с бекендом (объект с методом sendPostAndGetAnswer)
-   * @param {object} opts
-   *   - endpoints: { products: 'getProducts', categories: 'getCategories', productById: 'getProduct' }
-   *   - timeoutMs: number
+   * Статические текстовые сообщения для вывода пользователю
+   * @type {Readonly<Record<string,string>>}
+   */
+  static UI_MESSAGES = Object.freeze({
+    ERROR_NO_ENGINE: 'Интеграция с бекендом недоступна',
+    ERROR_TIMEOUT: 'Запрос продукта превысил время ожидания',
+    LOAD_PRODUCTS_ERROR: 'Ошибка загрузки списка товаров',
+    FETCH_BY_ID_ERROR: 'Ошибка получения данных товара',
+    FETCH_CATEGORIES_ERROR: 'Ошибка получения категорий',
+    FILL_CATEGORIES_WARN: 'ProductService.fillCategories: ошибка при заполнении select',
+    ALL_CATEGORIES_OPTION: 'Все категории',
+    ALL_BRANDS_OPTION: 'Все бренды',
+    SUBSCRIBE_ARG_ERROR: 'subscribe ожидает функцию',
+    UPSERT_ERROR: 'Ошибка добавления/обновления товара'
+  });
+
+  /**
+   * @param {any} foxEngine Экземпляр движка отправки запросов
+   * @param {Object} [opts]
+   * @param {Object} [opts.endpoints] Переопределения имён эндпоинтов
+   * @param {number} [opts.timeoutMs] Таймаут запросов в миллисекундах
+   * @param {boolean} [opts.debug] Включить логирование
    */
   constructor(foxEngine, opts = {}) {
-    this.foxEngine = foxEngine || null;
-    this.opts = Object.assign({
-      endpoints: {
+    if (!foxEngine) throw new TypeError('ProductService requires foxEngine');
+    this.foxEngine = foxEngine;
+    // деструктуризация настроек с дефолтами
+    const {
+      endpoints = {
         products: 'getProducts',
+        productById: 'getProduct',
         categories: 'getCategories',
-        productById: 'getProduct'
+        categoryById: 'getCategory',
+        brands: 'getBrands',
+        brandById: 'getBrand'
       },
-      timeoutMs: 7000
-    }, opts);
-
-    // internal storage
-    this.products = [];        // array of normalized product objects
-    this._productMap = new Map(); // name/id -> product (normalized)
+      timeoutMs = 7000,
+      debug = false
+    } = opts;
+    this.opts = { endpoints, timeoutMs, debug };
+    /** @type {Array<any>} */
+    this.products = [];
+    /** @type {Map<string,any>} */
+    this._productMap = new Map();
+    /** @type {Map<string,string>} */
+    this._categoriesMap = new Map();
+    /** @type {Map<string,string>} */
+    this._brandsMap = new Map();
+    /** @type {Set<Function>} */
     this._subscribers = new Set();
   }
 
-  /* ================== helpers ================== */
+  /* ---------------------- utils ---------------------- */
 
-  _normalizeId(id) {
-    if (id === undefined || id === null) return '';
-    return String(id).trim();
+  /**
+   * Подстановка значений в строку сообщений
+   * @param {string} key
+   * @param {Record<string,string|number>} vars
+   * @returns {string}
+   */
+  _msg(key, vars = {}) {
+    const tpl = (this.constructor && this.constructor.UI_MESSAGES && this.constructor.UI_MESSAGES[key]) || '';
+    return String(tpl).replace(/\{([^}]+)\}/g, (m, k) => Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m);
   }
 
-  _safeLog(...args) {
-    if (this.foxEngine && typeof this.foxEngine.log === 'function') {
-      try { this.foxEngine.log(...args); } catch (e) { /* ignore */ }
-    } else {
-      // keep console.warn but not noisy
-      // console.warn(...args);
-    }
+  /**
+   * Нормализует идентификатор в строку
+   * @param {any} v
+   * @returns {string}
+   */
+  _normalizeId(v) {
+    if (v === undefined || v === null) return '';
+    return String(v).trim();
   }
 
-  async _safeCall(actionPayload = {}, expect = 'JSON') {
-    // Wrap foxEngine.sendPostAndGetAnswer with safe checks and timeout
-    if (!this.foxEngine || typeof this.foxEngine.sendPostAndGetAnswer !== 'function') {
-      throw new Error('foxEngine.sendPostAndGetAnswer is not available');
-    }
-    const callPromise = this.foxEngine.sendPostAndGetAnswer(actionPayload, expect);
-    if (!this.opts.timeoutMs || this.opts.timeoutMs <= 0) return callPromise;
-    const timeoutMs = Number(this.opts.timeoutMs) || 7000;
+  /**
+   * Логирование в debug режиме
+   * @param {...any} args
+   */
+  _log(...args) {
+    if (!this.opts.debug) return;
+    const logger = typeof this.foxEngine.log === 'function' ? this.foxEngine.log.bind(this.foxEngine) : console.debug;
+    try { logger(...args); } catch (e) { console.debug(...args); }
+  }
+
+  /**
+   * Безопасный вызов удалённого метода с таймаутом
+   * @param {any} payload
+   * @param {string} expect
+   * @returns {Promise<any>}
+   */
+  async _safeCall(payload = {}, expect = 'JSON') {
+    const call = this.foxEngine.sendPostAndGetAnswer(payload, expect);
+    const timeout = Number(this.opts.timeoutMs) || 7000;
+    if (!timeout || timeout <= 0) return call;
     return Promise.race([
-      callPromise,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('ProductService: request timeout')), timeoutMs))
+      call,
+      new Promise((_, rej) => setTimeout(() => rej(new Error(this._msg('ERROR_TIMEOUT'))), timeout))
     ]);
   }
 
-  _normalizeProduct(raw) {
-    if (!raw || typeof raw !== 'object') return null;
-    // try common fields
-    const name = this._normalizeId(raw.name ?? raw.id ?? raw.title ?? raw.fullname ?? '');
-    const title = String(raw.fullname ?? raw.title ?? raw.name ?? '').trim();
-    const price = Number(raw.price ?? raw.cost ?? 0) || 0;
-    const oldPrice = Number(raw.oldPrice ?? raw.price_old ?? 0) || 0;
-    const stock = Number(raw.stock ?? raw.count ?? raw.qty ?? 0) || 0;
-    const picture = String(raw.picture ?? raw.image ?? raw.img ?? '/assets/no-image.png') || '/assets/no-image.png';
-    const category = raw.category ?? raw.cat ?? '';
-    const short = raw.short ?? raw.description ?? '';
-    const specs = raw.specs ?? raw.properties ?? raw.attributes ?? {};
+  /**
+   * Извлекает массив из ответа бекенда по предпочтительному списку ключей.
+   * @param {any} res
+   * @param {Array<string>} prefer
+   * @returns {Array<any>}
+   */
+  _extractArray(res, prefer = ['items', 'products', 'data', 'categories', 'brands', 'list']) {
+    if (!res) return [];
+    if (Array.isArray(res)) return res;
+    if (typeof res !== 'object') return [];
+    for (const k of prefer) if (Array.isArray(res[k])) return res[k];
+    for (const k of Object.keys(res)) if (Array.isArray(res[k])) return res[k];
+    return [res];
+  }
 
-    const normalized = {
-      // keep original data under _raw for debugging if needed
+  /**
+   * Записывает значение в карту, если ключ существует и не был записан ранее (или если overwrite=true)
+   * @param {Map<string,any>} map
+   * @param {string} key
+   * @param {any} value
+   * @param {boolean} [overwrite=false]
+   */
+  _setCache(map, key, value, overwrite = false) {
+    if (!key) return;
+    if (overwrite || !map.has(key)) map.set(key, value);
+  }
+
+  /**
+   * Уведомляет всех подписчиков об изменениях
+   * @param {Object} change
+   */
+  _notifySubscribers(change = { type: 'set', changedIds: [] }) {
+    for (const fn of this._subscribers) {
+      try { fn(change); } catch (e) { this._log('subscriber error', e); }
+    }
+  }
+
+  /* ---------------------- normalization helpers ---------------------- */
+
+  /**
+   * Разбирает и нормализует поля категории из сырого продукта
+   * @param {Object} raw
+   * @returns {{ key: string, name: string }}
+   */
+  _parseCategory(raw) {
+    const rawCat = raw.category ?? raw.cat ?? raw.categoryId ?? '';
+    const key = this._normalizeId(rawCat);
+    const name = String(raw.categoryName ?? raw.categoryFullname ?? '').trim();
+    return { key, name };
+  }
+
+  /**
+   * Разбирает и нормализует поля бренда из сырого продукта
+   * @param {Object} raw
+   * @returns {{ key: string, name: string }}
+   */
+  _parseBrand(raw) {
+    let rawBrand = raw.brand ?? raw.brandId ?? '';
+    if (typeof rawBrand === 'object') rawBrand = rawBrand.id ?? rawBrand.key ?? rawBrand.name ?? '';
+    const key = this._normalizeId(rawBrand);
+    const name = String(raw.brandName ?? raw.brandFullname ?? '').trim();
+    return { key, name };
+  }
+
+  /**
+   * Гарантирует наличие человеческих имён для категории и бренда (асинхронно)
+   * @param {string} categoryKey
+   * @param {string} brandKey
+   * @param {string} fallbackCategory
+   * @param {string} fallbackBrand
+   * @returns {Promise<[string,string]>}
+   */
+  async _resolveBrandAndCategoryNames(categoryKey, brandKey, fallbackCategory = '', fallbackBrand = '') {
+    const ensureBrandName = async () => {
+      if (!brandKey) return '';
+      if (this._brandsMap.has(brandKey)) return this._brandsMap.get(brandKey);
+      const fetched = await this.fetchBrandNameById(brandKey);
+      return fetched || '';
+    };
+    const ensureCatName = async () => {
+      if (!categoryKey) return '';
+      if (this._categoriesMap.has(categoryKey)) return this._categoriesMap.get(categoryKey);
+      const fetched = await this.fetchCatById(categoryKey);
+      return fetched || '';
+    };
+    const [brandNameResolved, catNameResolved] = await Promise.all([ensureBrandName(), ensureCatName()]);
+    const finalBrandName = fallbackBrand || brandNameResolved || brandKey;
+    const finalCatName = fallbackCategory || catNameResolved || categoryKey;
+    return [finalCatName, finalBrandName];
+  }
+
+  /**
+   * Нормализует одну запись продукта. Пополняет кэш категорий и брендов.
+   * @param {any} raw
+   * @returns {Promise<Object|null>}
+   */
+  async _normalizeProduct(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const name = this._normalizeId(raw.name ?? raw.id ?? raw.title ?? raw.fullname ?? raw.sku);
+    if (!name) return null;
+    const title = String(raw.fullname ?? raw.title ?? raw.name ?? '').trim();
+    const price = Number(raw.price ?? raw.cost ?? 0);
+    const oldPrice = Number(raw.oldPrice ?? raw.price_old ?? 0);
+    const stock = Number(raw.stock ?? raw.count ?? raw.qty ?? 0);
+    const picture = String(raw.picture ?? raw.image ?? raw.img ?? '/assets/no-image.png');
+    const { key: categoryKey, name: categoryNameInput } = this._parseCategory(raw);
+    const { key: brandKey, name: brandNameInput } = this._parseBrand(raw);
+    const [resolvedCatName, resolvedBrandName] = await this._resolveBrandAndCategoryNames(categoryKey, brandKey, categoryNameInput, brandNameInput);
+    // обновить кэши окончательными значениями
+    if (categoryKey && resolvedCatName) this._setCache(this._categoriesMap, categoryKey, resolvedCatName);
+    if (brandKey && resolvedBrandName) this._setCache(this._brandsMap, brandKey, resolvedBrandName);
+    return {
       _raw: raw,
-      // canonical fields
       name,
       fullname: title,
       title,
@@ -79,297 +238,508 @@ export class ProductService {
       oldPrice,
       stock,
       picture,
-      category,
-      short,
-      specs
+      category: categoryKey,
+      categoryName: resolvedCatName,
+      brand: brandKey,
+      brandName: resolvedBrandName,
+      short: raw.short ?? raw.description ?? '',
+      specs: raw.specs ?? raw.properties ?? raw.attributes ?? {}
     };
-    return normalized;
   }
 
-  _rebuildMap() {
-    this._productMap.clear();
-    for (const p of this.products) {
-      const id = this._normalizeId(p.name || p.id || p.title || p.fullname);
-      if (!id) continue;
-      this._productMap.set(id, p);
-    }
-  }
-
-  _notifySubscribers(change = { type: 'set', changedIds: [] }) {
-    try {
-      for (const fn of Array.from(this._subscribers)) {
-        try { fn(change); } catch (e) { /* ignore subscriber error */ }
-      }
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
-  /* ================== public API ================== */
+  /* ---------------------- products API ---------------------- */
 
   /**
-   * Load products from backend using foxEngine.
-   * Returns normalized products array.
-   * @param {object} opts { force: boolean }
-   */
-  async loadProductsSimple({ force = false } = {}) {
-    if (this.products.length && !force) {
-      return this.getProducts();
-    }
-    if (!this.foxEngine || typeof this.foxEngine.sendPostAndGetAnswer !== 'function') {
-      // no foxEngine — keep products empty but return safely
-      this.products = [];
-      this._rebuildMap();
-      return this.getProducts();
-    }
-
-    try {
-      const endpoint = this.opts.endpoints && this.opts.endpoints.products ? this.opts.endpoints.products : 'getProducts';
-      const payload = { sysRequest: endpoint };
-      const res = await this._safeCall(payload, 'JSON');
-
-      let items = [];
-      if (!res) {
-        items = [];
-      } else if (Array.isArray(res)) {
-        items = res;
-      } else if (res && typeof res === 'object') {
-        // prefer properties with array values (common backends)
-        if (Array.isArray(res.items)) items = res.items;
-        else if (Array.isArray(res.products)) items = res.products;
-        else if (Array.isArray(res.data)) items = res.data;
-        else {
-          // search for first array property
-          for (const k of Object.keys(res)) {
-            if (Array.isArray(res[k])) {
-              items = res[k];
-              break;
-            }
-          }
-        }
-      }
-
-      // normalize
-      this.products = (Array.isArray(items) ? items.map(r => this._normalizeProduct(r)).filter(Boolean) : []);
-      this._rebuildMap();
-      this._notifySubscribers({ type: 'reload', changedIds: this.products.map(p => p.name).filter(Boolean) });
-      return this.getProducts();
-    } catch (e) {
-      this._safeLog('ProductService.loadProductsSimple error', e);
-      // keep previous products if available, otherwise empty
-      if (!Array.isArray(this.products)) this.products = [];
-      this._rebuildMap();
-      return this.getProducts();
-    }
-  }
-
-  /**
-   * Returns a copy of products array (optionally shallow clones).
-   * @param {object} opts { clone: boolean }
+   * Возвращает список продуктов. По умолчанию возвращает копию.
+   * @param {Object} [param0]
+   * @param {boolean} [param0.clone=true]
+   * @returns {Array<any>}
    */
   getProducts({ clone = true } = {}) {
-    if (!Array.isArray(this.products)) return [];
-    return clone ? this.products.map(p => Object.assign({}, p)) : this.products;
+    return clone ? this.products.map((p) => Object.assign({}, p)) : this.products;
   }
 
   /**
-   * Synchronous find by id/name (fast using local map).
-   * Returns normalized product or null.
+   * Находит продукт по нормализованному id
+   * @param {any} id
+   * @returns {any|null}
    */
   findById(id) {
-    if (!id) return null;
     const sid = this._normalizeId(id);
-    if (!sid) return null;
-    return this._productMap.get(sid) || null;
+    return sid ? (this._productMap.get(sid) || null) : null;
   }
 
   /**
-   * Asynchronously fetch product by id from backend if not present locally.
-   * If product exists locally -> resolves to that product.
-   * If not and foxEngine available, will call configured endpoint.
-   * On success it will insert/merge product into local store and notify subscribers.
-   *
-   * @param {string} id
-   * @returns {Promise<null|object>} normalized product or null
+   * Загружает список товаров. Можно указать force=true для принудительного обновления.
+   * @param {Object} [options]
+   * @param {boolean} [options.force=false]
+   * @param {any} [options.request=null] Переопределение запроса
+   * @returns {Promise<Array<any>>}
+   */
+  async loadProductsSimple({ force = false, request = null } = {}) {
+    if (this.products.length && !force && !request) return this.getProducts();
+    const defaultEndpoint = this.opts.endpoints.products;
+    let endpoint = defaultEndpoint;
+    let payload = { sysRequest: endpoint };
+    if (request) {
+      if (typeof request === 'string') {
+        endpoint = request;
+        payload.sysRequest = endpoint;
+      } else {
+        const { endpoint: reqEndpoint, sysRequest: reqSys, payload: reqPayload, params: reqParams, ...extra } = request;
+        endpoint = reqEndpoint ?? reqSys ?? defaultEndpoint;
+        payload = Object.assign({}, reqParams ?? {}, reqPayload ?? {}, extra ?? {}, { sysRequest: endpoint });
+      }
+    }
+    try {
+      const res = await this._safeCall(payload, 'JSON');
+      const items = this._extractArray(res, ['items', 'products', 'data']);
+      const normalized = await Promise.all(items.map((i) => this._normalizeProduct(i)).filter(Boolean));
+      this.products = normalized;
+      this._rebuildMaps();
+      // ensure simple category/brand keys exist in maps (для фильтров)
+      for (const p of this.products) {
+        if (p.category && !this._categoriesMap.has(p.category)) this._categoriesMap.set(p.category, p.categoryName || p.category);
+        if (p.brand && !this._brandsMap.has(p.brand)) this._brandsMap.set(p.brand, p.brandName || p.brand);
+      }
+      this._notifySubscribers({ type: 'reload', changedIds: this.products.map((p) => p.name) });
+      return this.getProducts();
+    } catch (err) {
+      this._log(this._msg('LOAD_PRODUCTS_ERROR'), err);
+      this.products = this.products || [];
+      this._rebuildMaps();
+      return this.getProducts();
+    }
+  }
+
+  /**
+   * Загружает продукт по ID (если нет в кеше).
+   * @param {any} id
+   * @returns {Promise<any|null>}
    */
   async fetchById(id) {
     const sid = this._normalizeId(id);
     if (!sid) return null;
-
     const existing = this.findById(sid);
     if (existing) return existing;
-
-    if (!this.foxEngine || typeof this.foxEngine.sendPostAndGetAnswer !== 'function') {
-      return null;
-    }
+    const endpoint = this.opts.endpoints.productById;
     try {
-      const endpoint = this.opts.endpoints && this.opts.endpoints.productById ? this.opts.endpoints.productById : 'getProduct';
-      const payload = { sysRequest: endpoint, id: sid };
-      const res = await this._safeCall(payload, 'JSON');
-
-      let item = null;
-      if (!res) item = null;
-      else if (Array.isArray(res) && res.length) item = res[0];
-      else if (res && typeof res === 'object') {
-        // if server returns wrapper { product: {...} }
-        item = res.product ?? res;
-      }
-      if (!item) return null;
-
-      const normalized = this._normalizeProduct(item);
+      const res = await this._safeCall({ sysRequest: endpoint, id: sid }, 'JSON');
+      const items = this._extractArray(res, ['product', 'items', 'products', 'data']);
+      const raw = items.length ? items[0] : res.product ?? res;
+      if (!raw) return null;
+      const normalized = await this._normalizeProduct(raw);
       if (!normalized) return null;
-
-      // merge into products & map (avoid mutating original array reference if already present)
       this.products.push(normalized);
       this._productMap.set(normalized.name, normalized);
+      if (normalized.category) this._setCache(this._categoriesMap, normalized.category, normalized.categoryName || normalized.category);
+      if (normalized.brand) this._setCache(this._brandsMap, normalized.brand, normalized.brandName || normalized.brand);
       this._notifySubscribers({ type: 'add', changedIds: [normalized.name] });
       return normalized;
-    } catch (e) {
-      this._safeLog('ProductService.fetchById error', e);
+    } catch (err) {
+      this._log(this._msg('FETCH_BY_ID_ERROR'), err);
       return null;
     }
   }
 
   /**
-   * Replace product list with provided raw array (safe normalization).
-   * Notifies subscribers.
-   * @param {Array} rawProducts
+   * Заменяет текущий список продуктов новым массивом. Данные предварительно нормализуются.
+   * @param {Array<any>} rawProducts
+   * @returns {Promise<boolean>}
    */
-  setProducts(rawProducts = []) {
+  async setProducts(rawProducts = []) {
+    const arr = Array.isArray(rawProducts) ? rawProducts : [];
     try {
-      if (!Array.isArray(rawProducts)) rawProducts = [];
-      const normalized = rawProducts.map(r => this._normalizeProduct(r)).filter(Boolean);
+      const normalized = await Promise.all(arr.map((r) => this._normalizeProduct(r)).filter(Boolean));
       this.products = normalized;
-      this._rebuildMap();
-      this._notifySubscribers({ type: 'set', changedIds: this.products.map(p => p.name).filter(Boolean) });
+      this._rebuildMaps();
+      for (const p of this.products) {
+        if (p.category && !this._categoriesMap.has(p.category)) this._categoriesMap.set(p.category, p.categoryName || p.category);
+        if (p.brand && !this._brandsMap.has(p.brand)) this._brandsMap.set(p.brand, p.brandName || p.brand);
+      }
+      this._notifySubscribers({ type: 'set', changedIds: this.products.map((p) => p.name) });
       return true;
-    } catch (e) {
-      this._safeLog('ProductService.setProducts error', e);
+    } catch (err) {
+      this._log(this._msg('LOAD_PRODUCTS_ERROR'), err);
       return false;
     }
   }
 
   /**
-   * Get categories derived from current products (unique, sorted).
-   * If you need server categories, use fetchCategories()
+   * Перестраивает внутренние карты по текущему массиву продуктов
    */
-  getCategories() {
-    try {
-      const set = new Set();
-      for (const p of this.products) {
-        if (p && p.category) set.add(String(p.category));
-      }
-      return Array.from(set).filter(Boolean).sort();
-    } catch (e) {
-      return [];
+  _rebuildMaps() {
+    this._productMap.clear();
+    for (const p of this.products) {
+      if (!p || !p.name) continue;
+      const key = this._normalizeId(p.name);
+      this._productMap.set(key, p);
+      if (p.brand) this._setCache(this._brandsMap, p.brand, p.brandName || p.brand);
+      if (p.category) this._setCache(this._categoriesMap, p.category, p.categoryName || p.category);
     }
+  }
+  
+
+  /* ---------------------- categories / brands (fetch helpers) ---------------------- */
+
+  /**
+   * Запрашивает список сущностей (brands | categories) с бэкенда
+   * @param {string} entity
+   * @returns {Promise<Array<any>>}
+   */
+  async fetchList(entity) {
+    const endpoint = this.opts.endpoints[entity];
+    const res = await this._safeCall({ sysRequest: endpoint }, 'JSON');
+    return this._extractArray(res, [entity, 'data', 'items', 'list']);
   }
 
   /**
-   * Try to fetch categories from server and return them (array of {name, fullname}).
-   * Falls back to local derived categories.
+   * Получает сущность по id (brand или category)
+   * @param {string} entity
+   * @param {any} id
+   * @returns {Promise<any|null>}
+   */
+  async fetchEntityById(entity, id) {
+    const endpoint = this.opts.endpoints[`${entity}ById`];
+    const sid = this._normalizeId(id);
+    if (!sid) return null;
+    const res = await this._safeCall({ sysRequest: endpoint, id: sid }, 'JSON');
+    const arr = this._extractArray(res, [entity, 'data', 'items']);
+    if (Array.isArray(arr) && arr.length) {
+      const found = arr.find((x) => {
+        if (!x) return false;
+        const candidates = [x.id, x.key, x.name, x.code].map((v) => this._normalizeId(v)).filter(Boolean);
+        return candidates.includes(sid);
+      });
+      return found;
+    }
+    return res;
+  }
+
+  /**
+   * Запрашивает и обновляет список категорий
+   * @returns {Promise<Array<{name:string, fullname:string}>>}
    */
   async fetchCategories() {
-    if (!this.foxEngine || typeof this.foxEngine.sendPostAndGetAnswer !== 'function') {
-      return this.getCategories().map(c => ({ name: c, fullname: c }));
-    }
     try {
-      const endpoint = this.opts.endpoints && this.opts.endpoints.categories ? this.opts.endpoints.categories : 'getCategories';
-      const res = await this._safeCall({ sysRequest: endpoint }, 'JSON');
-
-      let arr = [];
-      if (Array.isArray(res)) arr = res;
-      else if (res && typeof res === 'object') {
-        if (Array.isArray(res.categories)) arr = res.categories;
-        else if (Array.isArray(res.data)) arr = res.data;
-        else {
-          for (const k of Object.keys(res)) {
-            if (Array.isArray(res[k])) { arr = res[k]; break; }
-          }
-        }
-      }
-
-      // normalize to {name, fullname}
-      const out = Array.isArray(arr) ? arr.map(c => {
+      const arr = await this.fetchList('categories');
+      const out = arr.map((c) => {
         if (!c) return null;
         if (typeof c === 'string') return { name: c, fullname: c };
         return { name: c.name ?? c.id ?? '', fullname: c.fullname ?? c.name ?? c.title ?? '' };
-      }).filter(Boolean) : [];
-
-      if (!out.length) {
-        // fallback to local categories
-        return this.getCategories().map(c => ({ name: c, fullname: c }));
-      }
-      return out;
-    } catch (e) {
-      this._safeLog('ProductService.fetchCategories error', e);
-      return this.getCategories().map(c => ({ name: c, fullname: c }));
+      }).filter(Boolean);
+      for (const c of out) this._setCache(this._categoriesMap, String(c.name).trim(), String(c.fullname).trim() || String(c.name).trim());
+      return out.length ? out : Array.from(this._categoriesMap.entries()).map(([name, fullname]) => ({ name, fullname }));
+    } catch (err) {
+      this._log(this._msg('FETCH_CATEGORIES_ERROR'), err);
+      return Array.from(this._categoriesMap.entries()).map(([name, fullname]) => ({ name, fullname }));
     }
   }
 
   /**
-   * Subscribe to product changes.
-   * callback(change) — change: {type: 'set'|'reload'|'add'|'update', changedIds: []}
-   * Returns unsubscribe function.
+   * Запрашивает и обновляет список брендов
+   * @returns {Promise<Array<{id:string, name:string, fullname:string}>>}
    */
-  subscribe(fn) {
-    if (typeof fn !== 'function') throw new TypeError('subscribe expects a function');
-    this._subscribers.add(fn);
-    return () => { try { this._subscribers.delete(fn); } catch (e) { /* ignore */ } };
-  }
-  
-    /**
-   * Попытаться заполнить <select> элемент категориями.
-   * selectEl — HTMLElement (select)
-   */
-  async fillCategories(selectEl) {
-    if (!selectEl) return;
+  async fetchBrands() {
     try {
-      const catArr = await this.foxEngine.sendPostAndGetAnswer({ sysRequest: "getCategories" }, "JSON") || [];
-      const nameToFull = {};
-      if (Array.isArray(catArr)) {
-        for (const c of catArr) {
-          if (c && c.name) nameToFull[c.name] = c.fullname || c.name;
+      const arr = await this.fetchList('brands');
+      const out = arr.map((b) => {
+        if (!b) return null;
+        if (typeof b === 'string') {
+          const id = this._normalizeId(b);
+          return { id, name: b, fullname: b };
+        }
+        const id = this._normalizeId(b.id ?? b.key ?? b.name ?? '');
+        if (!id) return null;
+        const name = String(b.name ?? b.fullname ?? b.title ?? b.label ?? id).trim();
+        const fullname = String(b.fullname ?? name).trim() || name || id;
+        return { id, name, fullname };
+      }).filter(Boolean);
+      for (const b of out) this._setCache(this._brandsMap, b.id, b.fullname || b.name);
+      // complement with brands found in products
+      for (const p of this.products) {
+        const bid = this._normalizeId(p.brand);
+        if (!bid) continue;
+        if (!this._brandsMap.has(bid)) this._brandsMap.set(bid, p.brandName || p.brand || bid);
+      }
+      return out.length ? out : Array.from(this._brandsMap.entries()).map(([id, fullname]) => ({ id, name: fullname, fullname }));
+    } catch (err) {
+      this._log('ProductService.fetchBrands failed', err);
+      // fallback: derive from products
+      const map = new Map();
+      for (const p of this.products) {
+        const bid = this._normalizeId(p.brand);
+        if (!bid) continue;
+        const name = p.brandName || p.brand || bid;
+        if (!map.has(bid)) map.set(bid, name);
+        if (!this._brandsMap.has(bid)) this._brandsMap.set(bid, name);
+      }
+      return Array.from(map.entries()).map(([id, name]) => ({ id, name, fullname: name }));
+    }
+  }
+
+  /**
+   * Получить название бренда по id из кеша или из продукта
+   * @param {any} id
+   * @returns {string}
+   */
+  getBrandNameById(id) {
+    const sid = this._normalizeId(id);
+    if (!sid) return '';
+    if (this._brandsMap.has(sid)) return this._brandsMap.get(sid);
+    for (const p of this.products) {
+      const bid = this._normalizeId(p.brand);
+      if (bid === sid) {
+        const nm = p.brandName || p.brand || bid;
+        this._brandsMap.set(sid, nm);
+        return nm;
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Асинхронно запрашивает название бренда по id с бэкенда
+   * @param {any} id
+   * @returns {Promise<string>}
+   */
+  async fetchBrandNameById(id) {
+    const sid = this._normalizeId(id);
+    if (!sid) return '';
+    try {
+      const item = await this.fetchEntityById('brands', sid);
+      if (!item) return '';
+      const bid = this._normalizeId(item.id ?? item.key ?? item.name) || sid;
+      const fullname = String(item.fullname ?? item.full_name ?? item.name ?? item.title ?? item.label ?? bid).trim() || bid;
+      this._brandsMap.set(bid, fullname);
+      return fullname;
+    } catch (err) {
+      this._log('ProductService.fetchBrandNameById failed', err);
+      return this.getBrandNameById(sid);
+    }
+  }
+
+  /**
+   * Получить название категории по id из кеша или из продукта
+   * @param {any} id
+   * @returns {string}
+   */
+  getCatNameById(id) {
+    const sid = this._normalizeId(id);
+    if (!sid) return '';
+    if (this._categoriesMap.has(sid)) return this._categoriesMap.get(sid);
+    for (const p of this.products) {
+      const cid = this._normalizeId(p.category);
+      if (cid === sid) {
+        const nm = p.categoryName || cid;
+        this._categoriesMap.set(sid, nm);
+        return nm;
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Асинхронно запрашивает название категории по id с бэкенда
+   * @param {any} id
+   * @returns {Promise<string>}
+   */
+  async fetchCatById(id) {
+    const sid = this._normalizeId(id);
+    if (!sid) return '';
+    try {
+      const item = await this.fetchEntityById('categories', sid);
+      if (!item) return '';
+      const cid = this._normalizeId(item.id ?? item.key ?? item.name) || sid;
+      const fullname = String(item.fullname ?? item.full_name ?? item.name ?? item.title ?? cid).trim() || cid;
+      this._categoriesMap.set(cid, fullname);
+      return fullname;
+    } catch (err) {
+      this._log('ProductService.fetchCatById failed', err);
+      return this.getCatNameById(sid);
+    }
+  }
+
+  /* ---------------------- fill select generic ---------------------- */
+
+  /**
+   * Универсальный наполнитель <select> на основе списка сущностей и данных из products.
+   * option.value == name (человеческое имя), data-id = оригинальный id (если есть), data-fullname = fullname
+   * @param {HTMLElement|string|null} selectEl
+   * @param {Object} param1
+   * @param {string} param1.entity
+   * @param {string} param1.productProp
+   * @param {boolean} [param1.includeAllOption=true]
+   * @param {boolean} [param1.onlyFromProducts=false]
+   * @param {boolean} [param1.sort=true]
+   * @param {string} [param1.allMsgKey='ALL_CATEGORIES_OPTION']
+   * @returns {Promise<boolean>}
+   */
+  async _fillSelectGeneric(selectEl, {
+    entity = 'categories',
+    productProp = 'category',
+    includeAllOption = true,
+    onlyFromProducts = false,
+    sort = true,
+    allMsgKey = 'ALL_CATEGORIES_OPTION'
+  } = {}) {
+    if (typeof selectEl === 'string') selectEl = document.querySelector(selectEl);
+    if (!selectEl) return false;
+    const collected = new Map(); // keyLower -> { id, name, fullname }
+    const add = (id, name, fullname) => {
+      const human = (name || fullname || id || '').trim();
+      if (!human) return;
+      const lk = human.toLowerCase();
+      const entry = collected.get(lk) || { id: '', name: '', fullname: '' };
+      if (!entry.name) entry.name = name || fullname || id;
+      if (!entry.fullname) entry.fullname = fullname || name || id;
+      if (!entry.id) entry.id = id || '';
+      collected.set(lk, entry);
+    };
+    // 1) fetch list (если разрешено)
+    if (!onlyFromProducts) {
+      const list = await this.fetchList(entity).catch((e) => { this._log(`fetchList(${entity}) failed`, e); return []; });
+      for (const it of list) {
+        if (!it) continue;
+        if (typeof it === 'string') {
+          add(it, it, it);
+        } else {
+          const id = this._normalizeId(it.id ?? it.key ?? it.name);
+          const name = String(it.name).trim();
+          const fullname = String(it.fullname).trim();
+          add(id, name, fullname);
+          // populate internal maps
+          if (entity === 'brands' && id && fullname) this._brandsMap.set(id, fullname);
+          if (entity === 'categories' && id && fullname) this._categoriesMap.set(id, fullname);
         }
       }
-      const cats = Array.from(new Set((this.products || []).map(p => p.category || '').filter(Boolean))).sort();
-      selectEl.innerHTML = '<option value="">Все категории</option>';
-      for (const c of cats) {
-        const o = document.createElement('option');
-        o.value = c;
-        o.textContent = nameToFull[c] || c;
-        selectEl.appendChild(o);
-      }
-    } catch (e) {
-      console.warn('ProductService.fillCategories', e);
     }
+    // 2) include items from products
+    for (const p of this.products) {
+      const id = this._normalizeId(p[productProp]);
+      const name = String(p[`${productProp}Name`]).trim();
+      const fullname = String(p[`${productProp}Fullname`]).trim();
+      add(id, name, fullname);
+      if (entity === 'brands' && id && fullname) this._brandsMap.set(id, fullname);
+      if (entity === 'categories' && id && fullname) this._categoriesMap.set(id, fullname);
+    }
+    let rows = Array.from(collected.values());
+    if (sort) rows.sort((a, b) => String(a.fullname || a.name).localeCompare(String(b.fullname || b.name)));
+    // fill select
+    selectEl.innerHTML = '';
+    if (includeAllOption) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = this._msg(allMsgKey);
+      selectEl.appendChild(opt);
+    }
+    for (const r of rows) {
+      const o = document.createElement('option');
+      o.value = r.name;
+      if (r.id) o.dataset.id = r.id;
+      if (r.fullname) o.dataset.fullname = r.fullname;
+      o.dataset.name = r.name;
+      o.textContent = r.fullname || r.name;
+      selectEl.appendChild(o);
+    }
+    return true;
   }
 
   /**
-   * Merge/Update a single product (raw object) into the local store.
-   * If product exists — it is merged; otherwise pushed.
-   * Notifies subscribers with changedIds.
+   * Заполняет select категориями
+   * @param {HTMLElement|string} selectEl
+   * @param {Object} opts
+   * @returns {Promise<boolean>}
    */
-  upsertProduct(raw) {
+  async fillCategories(selectEl, opts = {}) {
+    return this._fillSelectGeneric(selectEl, Object.assign({
+      entity: 'categories',
+      productProp: 'category',
+      allMsgKey: 'ALL_CATEGORIES_OPTION'
+    }, opts));
+  }
+
+  /**
+   * Заполняет select брендами
+   * @param {HTMLElement|string} selectEl
+   * @param {Object} opts
+   * @returns {Promise<boolean>}
+   */
+  async fillBrands(selectEl, opts = {}) {
+    return this._fillSelectGeneric(selectEl, Object.assign({
+      entity: 'brands',
+      productProp: 'brand',
+      allMsgKey: 'ALL_BRANDS_OPTION'
+    }, opts));
+  }
+
+  /* ---------------------- misc ---------------------- */
+
+  /**
+   * Подписывается на изменения. Возвращает функцию для отписки.
+   * @param {Function} fn
+   * @returns {Function}
+   */
+  subscribe(fn) {
+    if (typeof fn !== 'function') throw new TypeError(this._msg('SUBSCRIBE_ARG_ERROR'));
+    this._subscribers.add(fn);
+    return () => this._subscribers.delete(fn);
+  }
+
+  /**
+   * Добавляет или обновляет продукт. Возвращает нормализованный объект
+   * @param {any} raw
+   * @returns {Promise<any|null>}
+   */
+  async upsertProduct(raw) {
     try {
-      const normalized = this._normalizeProduct(raw);
+      const normalized = await this._normalizeProduct(raw);
       if (!normalized || !normalized.name) return null;
       const existing = this.findById(normalized.name);
       if (existing) {
-        // shallow merge: keep existing props unless new provides them
         Object.assign(existing, normalized);
         this._productMap.set(existing.name, existing);
+        this._setCache(this._categoriesMap, existing.category, existing.categoryName || existing.category);
+        this._setCache(this._brandsMap, existing.brand, existing.brandName || existing.brand);
         this._notifySubscribers({ type: 'update', changedIds: [existing.name] });
         return existing;
-      } else {
-        this.products.push(normalized);
-        this._productMap.set(normalized.name, normalized);
-        this._notifySubscribers({ type: 'add', changedIds: [normalized.name] });
-        return normalized;
       }
-    } catch (e) {
-      this._safeLog('ProductService.upsertProduct error', e);
+      this.products.push(normalized);
+      this._productMap.set(normalized.name, normalized);
+      this._setCache(this._categoriesMap, normalized.category, normalized.categoryName || normalized.category);
+      this._setCache(this._brandsMap, normalized.brand, normalized.brandName || normalized.brand);
+      this._notifySubscribers({ type: 'add', changedIds: [normalized.name] });
+      return normalized;
+    } catch (err) {
+      this._log(this._msg('UPSERT_ERROR'), err);
       return null;
     }
+  }
+
+  /**
+   * Создаёт и диспатчит событие storage, чтобы эмулировать изменение localStorage
+   * @param {string} key
+   * @param {string|null} oldValue
+   * @param {string|null} newValue
+   */
+  _dispatchLocalStorageEvent(key, oldValue, newValue) {
+    const ev = new StorageEvent('storage', { key, oldValue, newValue, url: location.href, storageArea: localStorage });
+    window.dispatchEvent(ev);
+  }
+
+  /**
+   * Очищает кеши продуктов, категорий или брендов
+   * @param {Object} param0
+   * @param {boolean} [param0.products=false]
+   * @param {boolean} [param0.categories=false]
+   * @param {boolean} [param0.brands=false]
+   */
+  clearCache({ products = false, categories = false, brands = false } = {}) {
+    if (products) {
+      this.products = [];
+      this._productMap.clear();
+    }
+    if (categories) this._categoriesMap.clear();
+    if (brands) this._brandsMap.clear();
   }
 }

@@ -1,4 +1,11 @@
-/* Notification */
+/* ============================================================================
+   Notification styles
+   Author: Calista Verner
+   Part of Shopmatic
+   Version: 1.0.0
+   Date: 2025-10-24
+   ============================================================================ */
+   
 .shop-notifications {
   position: fixed;
   bottom: 20px;

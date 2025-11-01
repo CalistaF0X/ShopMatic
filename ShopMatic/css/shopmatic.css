@@ -1,6 +1,10 @@
-/* ---------------------------
-   ShopMatic: Card + Wishlist (Polished & Modern)
-   --------------------------- */
+/* ============================================================================
+   Shopmatic basic styles
+   Author: Calista Verner
+   Part of Shopmatic
+   Version: 1.0.0
+   Date: 2025-10-24
+   ============================================================================ */
 
 :root{
   --card-bg: #ffffff;
@@ -62,6 +66,7 @@
 .card__body,
 .wish-card .wish-body {
   padding: 14px;
+  z-index: 2;
 }
 
 /* ---------- TITLE & META ---------- */
@@ -77,6 +82,7 @@
 }
 
 /* ---------- PRICE BLOCK ---------- */
+/*
 .price-block {
   display: flex;
   flex-direction: column;
@@ -84,7 +90,7 @@
   gap: 6px;
   min-width: 110px;
   text-align: right;
-}
+} */
 .badge {
   font-size: 12px;
   color: #fff;
@@ -150,10 +156,19 @@
 }
 
 /* primary add to cart */
-.card-controls .addToCart.btn,
-.addToCart {
+ .addToCart.btn {
   background: linear-gradient(90deg,var(--control-primary),var(--control-primary-hover));
   color: #111;
+  height: 56px;
+  border-radius: 12px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+.card-controls .addToCart.btn:hover,
+.addToCart:hover {
+  background: linear-gradient(90deg,var(--control-primary),var(--control-primary-hover));
+  color: #ffffff;
   height: 56px;
   border-radius: 12px;
   padding: 0 18px;
@@ -177,12 +192,16 @@
   .card__actions-row { flex-direction: column; gap: 10px; align-items: stretch; }
 }
 
-/* ---------- MINOR HELPERS ---------- */
-.small-muted { font-size: 13px; color: var(--muted); }
-.row { display:flex; gap:12px; align-items:center; }
-.gap-sm { gap:8px; }
 
 /* If JS wants to force-instant hide (no animation) */
 .wish-card--noanim { transition: none !important; animation: none !important; transform:none !important; opacity:0 !important; height:0 !important; padding:0 !important; margin:0 !important; overflow:hidden; }
+
+.catalog-empty {
+	padding: 30px;
+	text-align: center;
+	width: 100%;
+	border: 1px dotted;
+	border-radius: 10px;
+}
 
 /* End of polished styles */

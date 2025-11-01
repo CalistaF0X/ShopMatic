@@ -1,9 +1,13 @@
-/* ==========================================================================
-   THEME VARIABLES
-   ========================================================================== */
+/* ============================================================================
+   Cart styles
+   Author: Calista Verner
+   Part of Shopmatic
+   Version: 1.0.0
+   Date: 2025-10-24
+   ============================================================================ */
 :root {
   /* Surfaces & backgrounds */
-  --bg-main: #FBF8F3;           /* page background (light, warm) */
+  --bg-main: #ffffff;           /* page background (light, warm) */
   --bg-surface: #FFFFFF;        /* main surface / card background */
   --bg-secondary: #F6F3EE;      /* secondary surface (cards) */
   --bg-tertiary: #F4F3F0;       /* subtle tertiary surface */
@@ -54,6 +58,11 @@
   --qty-btn-disabled-opacity: 0.56;
   --qty-btn-transition: background .15s ease, color .15s ease, opacity .12s ease;
   --qty-btn-focus-ring: 0 0 0 3px rgba(34,125,255,0.12);
+  
+  --specs-line-accent: rgba(49, 34, 12, 0.161);
+    --specs-font-size: 14px;
+    --specs-title-weight: 600;
+    --specs-radius: 6px;
 }
 
 /* Reduce motion preference */
@@ -70,11 +79,12 @@
   border-radius: 24px;
   list-style: none;
   padding: 12px 12px 0;
-  /* box-shadow: var(--shadow); */
-  /* border: 1px solid var(--border); */
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
   transition: transform .18s ease, box-shadow .18s ease;
   font-family: var(--font-sans);
   color: var(--text-primary);
+  padding: 5px;
 }
 .cart-item:hover {
   transform: translateY(-3px);
@@ -169,10 +179,6 @@
   padding: 6px;
   border-radius: 8px;
 }
-.cart-item__icons button:hover {
-  color: var(--primary);
-  background: rgba(11,122,68,0.06);
-}
 
 /* ==========================================================================
    QUANTITY CONTROLS
@@ -181,11 +187,10 @@
   display: flex;
   align-items: center;
   border-radius: 10px;
-   /* fallback muted */
   background: #dfd3d36e; /* if you want neutral, override with var(--muted) elsewhere */
   overflow: hidden;
-  padding: 4px;
   gap: 6px;
+  width: fit-content;
   align-items: center;
 }
 
@@ -204,14 +209,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  line-height: 1;
+  /* line-height: 1; */
   box-shadow: none;
+  height: 100%;
 }
-.qty-btn:focus {
-  outline: none;
-  box-shadow: var(--qty-btn-focus-ring);
-}
+
 
 /* Disabled states (native + ARIA/class) */
 .qty-btn:disabled,
@@ -345,12 +347,12 @@
 .cart-summary__total { display: flex; flex-direction: column; gap: 8px; }
 .total-line { display: flex; justify-content: space-between; align-items: center; }
 .total-title { font-size: 18px; font-weight: 700; }
-.price-main { font-size: 22px; font-weight: 700; color: var(--accent); }
+.price-main {font-size: 22px;font-weight: 700;color: var(--price-term);}
 .currency { font-size: 18px; margin-left: 4px; color: var(--text-secondary); }
 
 /* Checkout button */
-.btn-checkout {
-  background: var(--accent);
+.cart-summary .btn-checkout {
+  background: var(--button-primary);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -362,6 +364,26 @@
   transition: background .2s ease, transform .1s ease;
 }
 .btn-checkout:hover { background: var(--accent-700); transform: translateY(-1px); }
+
+.cart-grid .cart-item__info > .specsBlock {
+    width: max-content;
+    margin: 0px 10px;
+}
+
+.cart-grid .specsEntry > .separator {
+    flex: 1 1 auto;
+    height: 1px;
+    opacity: 1;
+    background: transparent;
+}
+
+.cart-grid .specsBlock > .specsEntry {
+	display: flex;
+	align-items: center;
+	gap: 0;
+	padding: 0px;
+	min-height: 22px;
+}
 
 /* ==========================================================================
    PROMO FORM (modular)

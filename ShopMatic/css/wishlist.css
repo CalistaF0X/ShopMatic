@@ -1,3 +1,10 @@
+/* ============================================================================
+   WishList styles
+   Author: Calista Verner
+   Part of Shopmatic
+   Version: 1.0.0
+   Date: 2025-10-24
+   ============================================================================ */
     :root{
       --bg:#f6f7fb;
       --card-bg:#fff;
@@ -18,10 +25,6 @@
 	  }
 
 	  /* small elevation on hover to feel 'cardy' */
-	  .wish-card:hover {
-		box-shadow: 0 8px 26px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08);
-		transform: translateY(-2px);
-	  }
 
 	  /* fallback CSS removal anim */
 	  .wish-card--remove-css {
@@ -107,7 +110,7 @@
     @media (max-width:420px){ .grid{ grid-template-columns: 1fr;} }
 
     /* card */
-    .wish-card {
+    #wishlist-grid .wish-card {
       background:var(--card-bg);
       border-radius:var(--radius);
       overflow:hidden;
@@ -116,7 +119,7 @@
       flex-direction:column;
       transition: transform .18s ease, box-shadow .18s ease;
     }
-    .wish-card:hover { transform: translateY(-6px); box-shadow: 0 14px 36px rgba(16,24,40,0.09); }
+     #wishlist-grid .wish-card:hover {}
 
     .wish-media {
       position:relative;
@@ -125,7 +128,7 @@
       display:flex;
       justify-content:center;
       align-items:center;
-      min-height:150px;
+      height: 187px;
     }
     .wish-media img { max-width:100%; max-height:180px; object-fit:contain; border-radius:8px; }
 

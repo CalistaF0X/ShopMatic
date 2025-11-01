@@ -28,6 +28,34 @@ export function computeDiscountPercent(p) {
 }
 
 /**
+ * Message formatter utility
+ *
+ * Supports template variables like:
+ *   _msg('added', {count: 3})
+ *   // if UI_MESSAGES.added = "Добавлено {count} товаров"
+ *   // => "Добавлено 3 товаров"
+ *
+ * Can be used standalone or bound to a class with static UI_MESSAGES.
+ *
+ * @param {string} key - message key to fetch from UI_MESSAGES
+ * @param {object} vars - optional replacements for {placeholders}
+ * @param {object} [ctx] - optional context (class or instance with .UI_MESSAGES)
+ * @returns {string}
+ */
+export function _msg(key, vars = {}, ctx = null) {
+  const pool =
+    (ctx && ctx.UI_MESSAGES) ||
+    (ctx && ctx.constructor && ctx.constructor.UI_MESSAGES) ||
+    (this && this.constructor && this.constructor.UI_MESSAGES) ||
+    {};
+  let tpl = pool[key] ?? '';
+  return String(tpl).replace(/\{([^}]+)\}/g, (m, k) =>
+    Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m
+  );
+}
+
+
+/**
  * makeSpecHtmlPreview: принимает JSON-строку или объект и возвращает безопасный HTML
  * @param {string|object} specs
  * @returns {string}
@@ -48,10 +76,15 @@ export function makeSpecHtmlPreview(specs) {
   if (typeof data !== 'object' || Array.isArray(data) || !Object.keys(data).length) {
     return '';
   }
-  let html = '<strong>Основные характеристики:</strong><ul>';
+  let html = '<strong>Основные характеристики:</strong><div class="specsBlock">';
   for (const [key, value] of Object.entries(data)) {
-    html += `<li>${escapeHtml(key)}: ${escapeHtml(value)}</li>`;
+    html += `<div class="specsEntry">
+  <div class="specsTitle">${escapeHtml(key)}</div>
+  <div class="separator" aria-hidden="true"></div>
+  <div class="specsValue">${escapeHtml(value)}</div>
+</div>
+`;
   }
-  html += '</ul>';
+  html += '</div>';
   return html;
 }
