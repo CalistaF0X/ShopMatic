@@ -1,11 +1,30 @@
 /* ============================================================================
-   Notification styles
-   Author: Calista Verner
+   Detroit/CyberLife Notification styles
+   Adapted for the notification markup provided (shop-notification--info, is-visible, etc.)
    Part of Shopmatic
    Version: 1.0.0
    Date: 2025-10-24
    ============================================================================ */
-   
+
+/* Define fallback variables for the notification palette. If global variables
+   such as --primary are defined elsewhere (e.g. from a cart theme), those
+   will override these defaults. */
+:root {
+  --notif-bg: rgba(6, 20, 34, 0.75);
+  --notif-color: #e5f5ff;
+  --notif-accent: #00aaff;
+  --notif-shadow: 0 8px 20px rgba(0, 130, 200, 0.30);
+  --notif-font: "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --notif-radius: 12px;
+  --notif-success: #00c984;
+  --notif-warning: #ffd966;
+  --notif-danger: #ff5e5e;
+
+  /* Height of the progress/loading bar at bottom of notification */
+  --notif-progress-height: 3px;
+}
+
+/* Container for stacked notifications */
 .shop-notifications {
   position: fixed;
   bottom: 20px;
@@ -15,64 +34,115 @@
   gap: 10px;
   z-index: 9999;
   pointer-events: none;
+  font-family: var(--notif-font);
 }
 
+/* Base notification card */
 .shop-notification {
-  background: #323232;
-  color: #fff;
-  padding: 12px 18px;
-  border-radius: 10px;
+  background: var(--notif-bg);
+  color: var(--notif-color);
+  /* Reserve space at the bottom for the progress bar so content isn't overlapped */
+  padding: 14px 20px calc(14px + var(--notif-progress-height)) 20px;
+  border-radius: var(--notif-radius);
   font-size: 14px;
   opacity: 0;
-  transform: translateY(20px);
-  transition: all 0.4s ease;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transform: translateY(20px) scale(0.97);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: var(--notif-shadow);
+  border-left: 4px solid var(--primary, var(--notif-accent));
+  backdrop-filter: blur(8px);
   pointer-events: auto;
+  display: flex;
+  align-items: center;
+  max-width: 340px;
+  position: relative; /* allow absolute positioning of progress bar */
+  overflow: hidden;    /* hide progress bar rounding overflow */
 }
 
-.shop-notification.show {
+/* Visible state triggers fade and slide in */
+.shop-notification.is-visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
+/* Hide state triggers fade and slide down */
 .shop-notification.hide {
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(20px) scale(0.97);
 }
 
-.shop-notification span {
-	color: #ffffff;
-	display: flex;
+/* Modifier classes to color-code notifications */
+.shop-notification--info {
+  border-left-color: var(--primary, var(--notif-accent));
+}
+.shop-notification--success {
+  border-left-color: var(--notif-success);
+}
+.shop-notification--warning {
+  border-left-color: var(--notif-warning);
+}
+.shop-notification--error,
+.shop-notification--fail {
+  border-left-color: var(--notif-danger);
 }
 
-.shop-notification i.success {
-    margin: 0px 5px;
-    font-size: 15pt;
-    color: #348a34;
+/* Icon wrapper */
+.shop-notification__icon {
+  margin-right: 10px;
+  font-size: 16px;
+  line-height: 1;
 }
 
-.shop-notification i.warning {
-    margin: 0px 5px;
-    font-size: 15pt;
-    color: yellow;
+/* Icon colors based on type */
+.notif-icon--info { color: var(--primary, var(--notif-accent)); }
+.notif-icon--success { color: var(--notif-success); }
+.notif-icon--warning { color: var(--notif-warning); }
+.notif-icon--error,
+.notif-icon--fail { color: var(--notif-danger); }
+
+/* Message content */
+.shop-notification__content {
+  flex: 1;
+  color: var(--notif-color);
+  font-size: 14px;
+  line-height: 1.4;
 }
 
-.shop-notification i.fail {
-    margin: 0px 5px;
-    font-size: 15pt;
-    color: red;
+/* Close button */
+.shop-notification__close {
+  background: none;
+  border: none;
+  color: var(--notif-color);
+  font-size: 16px;
+  line-height: 1;
+  padding-left: 12px;
+  cursor: pointer;
+  transition: color .3s ease;
+}
+.shop-notification__close:hover {
+  color: var(--primary, var(--notif-accent));
 }
 
-.shop-notification a {
-	color: #fce000;
-    margin-left: 6px;
-    font-weight: 500;
-    font-size: 14px;
-    line-height: 16px;
-    letter-spacing: .25px;
-    cursor: pointer;
+/* Loading bar: placed at the bottom of each notification and shrinks over time */
+.shop-notification__progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: var(--notif-progress-height);
+  background: var(--notif-accent);
+  border-radius: 0 0 var(--notif-radius) var(--notif-radius);
+  margin-top: 0;
+  overflow: hidden;
 }
-
-.shop-notification a:hover {
-	color: #c5b957;
+/* Progress bar color by type */
+.shop-notification--success .shop-notification__progress {
+  background: var(--notif-success);
+}
+.shop-notification--warning .shop-notification__progress {
+  background: var(--notif-warning);
+}
+.shop-notification--error .shop-notification__progress,
+.shop-notification--fail .shop-notification__progress {
+  background: var(--notif-danger);
 }

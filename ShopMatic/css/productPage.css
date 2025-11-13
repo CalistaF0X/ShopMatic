@@ -163,20 +163,6 @@
     align-items: center;
 }
 
-.product-page .fav-toggle, .product-page .wishlist-toggle {
-    padding: .5rem .7rem;
-    border-radius: 10px;
-    font-weight: 600;
-    border: 1px solid #eef2f6;
-    background: #fff;
-    cursor: pointer;
-    transition: box-shadow .12s ease, transform .06s ease;
-}
-
-.product-page .fav-toggle:focus-visible, .product-page .wishlist-toggle:focus-visible {
-    outline: 3px solid rgba(13,110,253,0.12);
-}
-
 /* delivery / seller */
 .product-page .delivery {
     font-size: .95rem;
@@ -330,7 +316,42 @@
     border-radius: 10px;
 }
 
-.buybox-card {
+.product-buybox > .productActions {
+	display: flex;
+	justify-content: flex-end;
+	flex: 1 0 444px;
+	padding-top: 4px;
+	padding-right: 4px;
+}
+
+.product-buybox > .productActions > button.action {
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: transparent;
+    font-size: 8pt;
+    border: none;
+    cursor: pointer;
+}
+
+.product-buybox > .productActions > .action i {
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: 13px;
+	transition: color .18s ease, background .18s ease;
+	border-radius: 8px;
+}
+
+.product-buybox > .productActions > .action i:not(.active) {
+	color: var(--text-secondary);
+}
+
+button.fav-toggle i.active {
+	color: var(--danger);
+}
+
+
+.product-buybox > .buybox-card {
     background: #fff;
     padding: 18px;
     border: 1px solid var(--border);
@@ -416,13 +437,6 @@
     gap: 10px;
 }
 
-.fav-toggle {
-    padding: 8px 10px;
-    border-radius: 10px;
-    background: transparent;
-    border: 1px solid var(--border);
-    cursor: pointer;
-}
 
 /* related section (full width under grid) */
 .product-related {

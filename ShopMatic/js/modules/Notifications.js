@@ -1,28 +1,22 @@
-/**
- * shopmatic/Notifications.js
+/*
+ * shopmatic/NotificationsOptimized.js
  *
- * Notifications manager for ShopMatic
+ * Optimized notifications manager for ShopMatic with CyberLife style and
+ * built-in progress bar. This version extends the existing Notifications
+ * manager by adding a loading bar that shrinks over the notification
+ * lifetime, integrates pause/resume behaviour with the timer, and
+ * supports a modern CyberLife aesthetic via external CSS (see
+ * notifications_detroit.css).
  *
- * Author: Calista Verner
- * Version: 1.3.0
- * Date: 2025-10-14
+ * Author: Calista Verner (modifications by optimization)
+ * Version: 1.4.0
+ * Date: 2025-10-24
  * License: MIT
- *
- * Responsibilities:
- *  - display transient notifications (info/success/warning/error)
- *  - safe text insertion by default, optional trusted HTML via allowHtml
- *  - pause-on-hover, dismissible, keyboard dismiss, max visible items
- *  - returns control handle { id, dismiss, promise }
- *
- * Notes:
- *  - All user-facing strings are centralized in UI_MESSAGES.
- *  - The class is defensive and tolerates missing DOM.
  */
 
 export class Notifications {
   static UI_MESSAGES = Object.freeze({
     CLOSE_BUTTON_LABEL: 'Закрыть уведомление',
-    // resolver reasons (useful if you want to show or log them elsewhere)
     REASON_TIMEOUT: 'timeout',
     REASON_MANUAL: 'manual',
     REASON_KEYBOARD: 'keyboard',
@@ -39,6 +33,7 @@ export class Notifications {
   }
 
   constructor(opts = {}) {
+    // Default settings extended with progress bar option
     this.opts = Object.assign({
       duration: 3000,
       position: { right: 20, bottom: 20 },
@@ -48,13 +43,14 @@ export class Notifications {
       allowHtml: false,
       containerClass: 'shop-notifications',
       notificationClass: 'shop-notification',
-      ariaLive: 'polite'
+      ariaLive: 'polite',
+      showProgressBar: true // display loading bar by default
     }, opts);
 
     this._container = null;
     this._idCounter = 1;
-    this._timers = new Map();    // id -> timeoutId
-    this._resolvers = new Map(); // id -> resolver
+    this._timers = new Map();
+    this._resolvers = new Map();
   }
 
   show(message, opts = {}) {
@@ -73,6 +69,7 @@ export class Notifications {
     note.setAttribute('aria-live', opts.ariaLive ?? cfg.ariaLive);
     note.setAttribute('aria-atomic', 'true');
 
+    // Icon mapping
     const ICONS = {
       success: 'fa-solid fa-check',
       warning: 'fa-solid fa-triangle-exclamation',
@@ -82,13 +79,14 @@ export class Notifications {
     const typeKey = (cfg.type && String(cfg.type)) ? String(cfg.type) : 'info';
     const iconClass = ICONS[typeKey] || ICONS.info;
 
+    // Create icon element
     const iconEl = document.createElement('i');
     iconEl.className = `${iconClass} ${cfg.notificationClass}__icon notif-icon notif-icon--${typeKey}`;
     iconEl.setAttribute('aria-hidden', 'true');
 
+    // Content element
     const content = document.createElement('div');
     content.className = `${cfg.notificationClass}__content`;
-
     if (message instanceof Node) {
       content.appendChild(message);
     } else {
@@ -102,6 +100,7 @@ export class Notifications {
     note.appendChild(iconEl);
     note.appendChild(content);
 
+    // Dismiss button if enabled
     if (cfg.dismissible) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -112,6 +111,16 @@ export class Notifications {
       note.appendChild(btn);
     }
 
+    // Progress bar element (insert before close button so it sits at bottom)
+    let progress = null;
+    let parentWidth = 0;
+    if (cfg.showProgressBar) {
+      progress = document.createElement('div');
+      progress.className = `${cfg.notificationClass}__progress`;
+      note.appendChild(progress);
+    }
+
+    // Timer management
     let remainingDuration = Number(cfg.duration) || 0;
     let startTs = Date.now();
     let timeoutId = null;
@@ -136,17 +145,49 @@ export class Notifications {
       const elapsed = Date.now() - startTs;
       remainingDuration = Math.max(0, remainingDuration - elapsed);
       clearTimer();
+      // Pause progress bar by freezing current width
+      if (progress) {
+        const parent = progress.parentNode;
+        if (parent) parentWidth = parent.clientWidth;
+        const currentWidth = progress.getBoundingClientRect().width;
+        const pct = parentWidth ? (currentWidth / parentWidth) * 100 : 0;
+        progress.style.transition = 'none';
+        progress.style.width = `${pct}%`;
+      }
     };
     const resumeTimer = () => {
       if (!cfg.pauseOnHover) return;
+      // Resume timer with remaining duration
       startTimer(remainingDuration);
+      // Resume progress bar transition
+      if (progress) {
+        // Ensure parent width is up to date
+        const parent = progress.parentNode;
+        parentWidth = parent ? parent.clientWidth : parentWidth;
+        // Set transition for remaining time and animate to 0
+        progress.style.transition = `width ${remainingDuration}ms linear`;
+        progress.style.width = '0%';
+      }
     };
 
     note.classList.add('is-entering');
     container.appendChild(note);
+    // Trigger CSS enter transition
     requestAnimationFrame(() => {
       note.classList.remove('is-entering');
       note.classList.add('is-visible');
+      // Start progress bar animation on next tick
+      if (progress) {
+        // Get parent width now
+        parentWidth = progress.parentNode ? progress.parentNode.clientWidth : 0;
+        progress.style.transition = 'none';
+        progress.style.width = '100%';
+        // Start shrinking after a frame
+        requestAnimationFrame(() => {
+          progress.style.transition = `width ${remainingDuration}ms linear`;
+          progress.style.width = '0%';
+        });
+      }
     });
 
     const performRemove = (reason = this.constructor.UI_MESSAGES.REASON_MANUAL) => {
@@ -176,14 +217,20 @@ export class Notifications {
     const promise = new Promise((resolve) => { this._resolvers.set(id, resolve); });
     const dismiss = (reason = this.constructor.UI_MESSAGES.REASON_MANUAL) => performRemove(reason);
 
+    // Hover events for pause/resume
     if (cfg.pauseOnHover) {
       note.addEventListener('mouseenter', pauseTimer);
       note.addEventListener('mouseleave', resumeTimer);
     }
+    // Keyboard dismiss
     note.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape' || ev.key === 'Esc') { ev.preventDefault(); dismiss(this.constructor.UI_MESSAGES.REASON_KEYBOARD); }
+      if (ev.key === 'Escape' || ev.key === 'Esc') {
+        ev.preventDefault();
+        dismiss(this.constructor.UI_MESSAGES.REASON_KEYBOARD);
+      }
     });
 
+    // Start the timer
     remainingDuration = Number(cfg.duration) || 0;
     if (remainingDuration > 0) startTimer(remainingDuration);
 
@@ -224,10 +271,10 @@ export class Notifications {
       if (overflow > 0) {
         const toRemove = Array.from(nodes).slice(0, overflow);
         toRemove.forEach(n => {
+          const id = n.getAttribute('data-notification-id');
           n.classList.remove('is-visible');
           n.classList.add('is-leaving');
           setTimeout(() => { if (n.parentNode) n.parentNode.removeChild(n); }, 320);
-          const id = n.getAttribute('data-notification-id');
           const resolver = this._resolvers.get(id);
           if (resolver) { try { resolver({ id, reason: this.constructor.UI_MESSAGES.REASON_EVICTED }); } catch (e) {} }
           this._resolvers.delete(id);

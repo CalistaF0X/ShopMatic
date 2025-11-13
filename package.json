@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "build": "esbuild ShopMatic/js/ShopMatic.js --bundle --format=esm --outfile=dist/ShopMatic.js --global-name=ShopMatic --loader:.js=js --log-level=info --sourcemap"
+  },
+  
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  },
+  "dependencies": {
+    "jquery": "^3.7.1"
+  }
+}

@@ -293,12 +293,12 @@ export class StorageService {
       };
 
       const viewed = this.loadViewed() ?? [];
-      // удалить дубликаты и положить новый в начало
       const filtered = viewed.filter(p => p.name !== item.name);
       filtered.unshift(item);
       const limited = filtered.slice(0, this.maxViewedItems);
 
       this._safeSetItem(this.viewedStorageKey, limited);
+	  this.shopMatic.viewedModule.sync();
     } catch (e) {
       console.warn('StorageService.addViewed error', e);
     }
@@ -312,6 +312,7 @@ export class StorageService {
     try {
       if (!this._storageAvailable()) return;
       localStorage.removeItem(this.viewedStorageKey);
+	  this.shopMatic.viewedModule.sync();
     } catch (e) {
       console.warn('StorageService.clearViewed error', e);
     }

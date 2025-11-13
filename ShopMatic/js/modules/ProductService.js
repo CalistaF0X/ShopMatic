@@ -1,19 +1,15 @@
-// @ts-check
 import { escapeHtml as _escapeHtml } from './utils.js';
 
 /**
  * ProductService
+ * @author Calista Verner
  *
- * Данный класс инкапсулирует логику загрузки и нормализации
- * продуктов, категорий и брендов. Оптимизация заключается в
- * упрощении конструирования, улучшении разделения обязанностей,
- * сокращении повторов кода и более эффективном кешировании.
- *
- * Основные изменения:
- *  - Использование деструктуризации для настроек конструктора
- *  - Вынесены повторяющиеся фрагменты в отдельные методы
- *  - Упрощён доступ к картам категорий и брендов
- *  - Повышена читаемость и расширяемость API
+ * Этот класс инкапсулирует логику загрузки и нормализации
+ * продуктов, категорий и брендов. Оптимизированная версия
+ * сохраняет прежний интерфейс (публичные методы и поля),
+ * упрощает внутренние процессы и повышает читаемость. Используются
+ * вспомогательные методы для сокращения дублирования и обеспечения
+ * единообразия.
  */
 export class ProductService {
   /**
@@ -49,9 +45,7 @@ export class ProductService {
         products: 'getProducts',
         productById: 'getProduct',
         categories: 'getCategories',
-        categoryById: 'getCategory',
-        brands: 'getBrands',
-        brandById: 'getBrand'
+        brands: 'getBrands'
       },
       timeoutMs = 7000,
       debug = false
@@ -193,15 +187,13 @@ export class ProductService {
   async _resolveBrandAndCategoryNames(categoryKey, brandKey, fallbackCategory = '', fallbackBrand = '') {
     const ensureBrandName = async () => {
       if (!brandKey) return '';
-      if (this._brandsMap.has(brandKey)) return this._brandsMap.get(brandKey);
       const fetched = await this.fetchBrandNameById(brandKey);
-      return fetched || '';
+      return fetched;
     };
     const ensureCatName = async () => {
       if (!categoryKey) return '';
-      if (this._categoriesMap.has(categoryKey)) return this._categoriesMap.get(categoryKey);
       const fetched = await this.fetchCatById(categoryKey);
-      return fetched || '';
+      return fetched;
     };
     const [brandNameResolved, catNameResolved] = await Promise.all([ensureBrandName(), ensureCatName()]);
     const finalBrandName = fallbackBrand || brandNameResolved || brandKey;
@@ -277,7 +269,7 @@ export class ProductService {
    * @returns {Promise<Array<any>>}
    */
   async loadProductsSimple({ force = false, request = null } = {}) {
-    if (this.products.length && !force && !request) return this.getProducts();
+    //if (this.products.length && !force && !request) return this.getProducts();
     const defaultEndpoint = this.opts.endpoints.products;
     let endpoint = defaultEndpoint;
     let payload = { sysRequest: endpoint };
@@ -300,7 +292,7 @@ export class ProductService {
       // ensure simple category/brand keys exist in maps (для фильтров)
       for (const p of this.products) {
         if (p.category && !this._categoriesMap.has(p.category)) this._categoriesMap.set(p.category, p.categoryName || p.category);
-        if (p.brand && !this._brandsMap.has(p.brand)) this._brandsMap.set(p.brand, p.brandName || p.brand);
+        if (p.brand && !this._brandsMap.has(p.brand)) this._brandsMap.set(p.brand, p.brandName);
       }
       this._notifySubscribers({ type: 'reload', changedIds: this.products.map((p) => p.name) });
       return this.getProducts();
@@ -378,7 +370,6 @@ export class ProductService {
       if (p.category) this._setCache(this._categoriesMap, p.category, p.categoryName || p.category);
     }
   }
-  
 
   /* ---------------------- categories / brands (fetch helpers) ---------------------- */
 
@@ -400,7 +391,7 @@ export class ProductService {
    * @returns {Promise<any|null>}
    */
   async fetchEntityById(entity, id) {
-    const endpoint = this.opts.endpoints[`${entity}ById`];
+    const endpoint = this.opts.endpoints[`${entity}`];
     const sid = this._normalizeId(id);
     if (!sid) return null;
     const res = await this._safeCall({ sysRequest: endpoint, id: sid }, 'JSON');
@@ -509,8 +500,8 @@ export class ProductService {
     try {
       const item = await this.fetchEntityById('brands', sid);
       if (!item) return '';
-      const bid = this._normalizeId(item.id ?? item.key ?? item.name) || sid;
-      const fullname = String(item.fullname ?? item.full_name ?? item.name ?? item.title ?? item.label ?? bid).trim() || bid;
+      const bid = this._normalizeId(item.name) || sid;
+      const fullname = String(item.fullname).trim() || bid;
       this._brandsMap.set(bid, fullname);
       return fullname;
     } catch (err) {
@@ -550,8 +541,8 @@ export class ProductService {
     try {
       const item = await this.fetchEntityById('categories', sid);
       if (!item) return '';
-      const cid = this._normalizeId(item.id ?? item.key ?? item.name) || sid;
-      const fullname = String(item.fullname ?? item.full_name ?? item.name ?? item.title ?? cid).trim() || cid;
+      const cid = this._normalizeId(item.name) || sid;
+      const fullname = String(item.fullname).trim() || cid;
       this._categoriesMap.set(cid, fullname);
       return fullname;
     } catch (err) {
@@ -564,86 +555,154 @@ export class ProductService {
 
   /**
    * Универсальный наполнитель <select> на основе списка сущностей и данных из products.
-   * option.value == name (человеческое имя), data-id = оригинальный id (если есть), data-fullname = fullname
+   * Дубликаты объединяются по «слагу», строка 'undefined' считается пустой.
+   * option.value равен id (если есть) либо name; data-id = оригинальный id (если есть),
+   * data-fullname = fullname, data-name = name.
+   *
    * @param {HTMLElement|string|null} selectEl
    * @param {Object} param1
-   * @param {string} param1.entity
-   * @param {string} param1.productProp
+   * @param {string} param1.entity (например, 'categories' или 'brands')
+   * @param {string} param1.productProp (например, 'category' или 'brand')
    * @param {boolean} [param1.includeAllOption=true]
    * @param {boolean} [param1.onlyFromProducts=false]
    * @param {boolean} [param1.sort=true]
    * @param {string} [param1.allMsgKey='ALL_CATEGORIES_OPTION']
    * @returns {Promise<boolean>}
    */
-  async _fillSelectGeneric(selectEl, {
+/**
+ * Универсальный наполнитель <select> на основе списка сущностей и данных из products.
+ * Дубликаты объединяются по «слагу», строка 'undefined' считается пустой.
+ * option.value равен id (если есть) либо name; data-id = оригинальный id (если есть),
+ * data-fullname = fullname, data-name = name.
+ *
+ * @param {HTMLElement|string|null} selectEl
+ * @param {Object} param1
+ * @param {string} param1.entity (например, 'categories' или 'brands')
+ * @param {string} param1.productProp (например, 'category' или 'brand')
+ * @param {boolean} [param1.includeAllOption=true]
+ * @param {boolean} [param1.onlyFromProducts=false]
+ * @param {boolean} [param1.sort=true]
+ * @param {string} [param1.allMsgKey='ALL_CATEGORIES_OPTION']
+ * @param {string} [param1.selected=""] значение, которое должно быть выбрано
+ * @returns {Promise<boolean>}
+ */
+async _fillSelectGeneric(
+  selectEl,
+  {
     entity = 'categories',
     productProp = 'category',
     includeAllOption = true,
     onlyFromProducts = false,
     sort = true,
-    allMsgKey = 'ALL_CATEGORIES_OPTION'
-  } = {}) {
-    if (typeof selectEl === 'string') selectEl = document.querySelector(selectEl);
-    if (!selectEl) return false;
-    const collected = new Map(); // keyLower -> { id, name, fullname }
-    const add = (id, name, fullname) => {
-      const human = (name || fullname || id || '').trim();
-      if (!human) return;
-      const lk = human.toLowerCase();
-      const entry = collected.get(lk) || { id: '', name: '', fullname: '' };
-      if (!entry.name) entry.name = name || fullname || id;
-      if (!entry.fullname) entry.fullname = fullname || name || id;
-      if (!entry.id) entry.id = id || '';
-      collected.set(lk, entry);
-    };
-    // 1) fetch list (если разрешено)
-    if (!onlyFromProducts) {
-      const list = await this.fetchList(entity).catch((e) => { this._log(`fetchList(${entity}) failed`, e); return []; });
-      for (const it of list) {
-        if (!it) continue;
-        if (typeof it === 'string') {
-          add(it, it, it);
-        } else {
-          const id = this._normalizeId(it.id ?? it.key ?? it.name);
-          const name = String(it.name).trim();
-          const fullname = String(it.fullname).trim();
-          add(id, name, fullname);
-          // populate internal maps
-          if (entity === 'brands' && id && fullname) this._brandsMap.set(id, fullname);
-          if (entity === 'categories' && id && fullname) this._categoriesMap.set(id, fullname);
+    allMsgKey = 'ALL_CATEGORIES_OPTION',
+    selected = ""          // <--- вот он
+  } = {}
+) {
+  if (typeof selectEl === 'string') selectEl = document.querySelector(selectEl);
+  if (!selectEl) return false;
+
+  const slug = (str) => String(str).toLowerCase().replace(/\s+/g, '');
+  const collected = new Map();
+
+  const add = (id, name, fullname) => {
+    const safeName = name && name.toLowerCase() !== 'undefined' ? name : '';
+    const safeFullname = fullname && fullname.toLowerCase() !== 'undefined' ? fullname : '';
+    const human = safeFullname || safeName || id;
+    if (!human) return;
+    const key = slug(human);
+    const entry = collected.get(key) || { id: '', name: '', fullname: '' };
+    if (!entry.id && id) entry.id = id;
+    if (!entry.name && safeName) entry.name = safeName;
+    if (!entry.fullname && safeFullname) entry.fullname = safeFullname;
+    collected.set(key, entry);
+  };
+
+  // 1) fetch list unless onlyFromProducts
+  if (!onlyFromProducts) {
+    const list = await this.fetchList(entity).catch((e) => {
+      this._log(`fetchList(${entity}) failed`, e);
+      return [];
+    });
+    for (const it of list) {
+      if (!it) continue;
+      if (typeof it === 'string') {
+        add(it, it, it);
+      } else {
+        const id = this._normalizeId(it.id ?? it.key ?? it.name);
+        const name = it.name != null ? String(it.name).trim() : '';
+        const fullname = it.fullname != null ? String(it.fullname).trim() : '';
+        add(id, name, fullname);
+
+        if (entity === 'brands') {
+          const nm = (fullname && fullname.toLowerCase() !== 'undefined') ? fullname : name;
+          if (id && nm) this._brandsMap.set(id, nm);
+        }
+        if (entity === 'categories') {
+          const nm = (fullname && fullname.toLowerCase() !== 'undefined') ? fullname : name;
+          if (id && nm) this._categoriesMap.set(id, nm);
         }
       }
     }
-    // 2) include items from products
+  }
+
+  // 2) include items from products
+  if (!onlyFromProducts) {
     for (const p of this.products) {
       const id = this._normalizeId(p[productProp]);
-      const name = String(p[`${productProp}Name`]).trim();
-      const fullname = String(p[`${productProp}Fullname`]).trim();
+      const name = p[`${productProp}Name`] != null ? String(p[`${productProp}Name`]).trim() : '';
+      const fullname = p[`${productProp}Fullname`] != null ? String(p[`${productProp}Fullname`]).trim() : '';
       add(id, name, fullname);
-      if (entity === 'brands' && id && fullname) this._brandsMap.set(id, fullname);
-      if (entity === 'categories' && id && fullname) this._categoriesMap.set(id, fullname);
+
+      if (entity === 'brands') {
+        const nm = (fullname && fullname.toLowerCase() !== 'undefined') ? fullname : name;
+        if (id && nm) this._brandsMap.set(id, nm);
+      }
+      if (entity === 'categories') {
+        const nm = (fullname && fullname.toLowerCase() !== 'undefined') ? fullname : name;
+        if (id && nm) this._categoriesMap.set(id, nm);
+      }
     }
-    let rows = Array.from(collected.values());
-    if (sort) rows.sort((a, b) => String(a.fullname || a.name).localeCompare(String(b.fullname || b.name)));
-    // fill select
-    selectEl.innerHTML = '';
-    if (includeAllOption) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = this._msg(allMsgKey);
-      selectEl.appendChild(opt);
-    }
-    for (const r of rows) {
-      const o = document.createElement('option');
-      o.value = r.name;
-      if (r.id) o.dataset.id = r.id;
-      if (r.fullname) o.dataset.fullname = r.fullname;
-      o.dataset.name = r.name;
-      o.textContent = r.fullname || r.name;
-      selectEl.appendChild(o);
-    }
-    return true;
   }
+
+  let rows = Array.from(collected.values());
+  if (sort) {
+    rows.sort((a, b) => String(a.fullname || a.name).localeCompare(String(b.fullname || b.name)));
+  }
+
+  selectEl.innerHTML = '';
+
+  if (includeAllOption) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = this._msg(allMsgKey);
+
+    // если selected === "" (по умолчанию) — выделяем "Все"
+    if (selected === '' || selected == null) {
+      opt.selected = true;
+    }
+
+    selectEl.appendChild(opt);
+  }
+
+  for (const r of rows) {
+    const o = document.createElement('option');
+    o.value = r.name; // если хочешь — можно поменять на r.id
+    if (r.id) o.dataset.id = r.id;
+    if (r.fullname && r.fullname.toLowerCase() !== 'undefined') o.dataset.fullname = r.fullname;
+    o.dataset.name = r.name || '';
+    o.textContent = r.fullname || r.name || r.id;
+
+    // если значение совпало с selected — ставим выбранным
+    if (selected !== '' && String(o.value) === String(selected)) {
+      o.selected = true;
+    }
+
+    selectEl.appendChild(o);
+  }
+
+  return true;
+}
+
 
   /**
    * Заполняет select категориями

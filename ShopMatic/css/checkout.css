@@ -1,0 +1,271 @@
+#top-second-section {
+  font-family: 'Roboto', sans-serif;
+  display: flex;
+  gap: 16px;
+  margin: 0 auto;
+  max-width: 1200px;
+}
+
+.delivery-point, .recipient-selector {
+  background-color: var(--bg-secondary);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.delivery-point-button, .recipient-button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #fff;
+  border: 2px solid #dcdcdc;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
+}
+
+.delivery-point-button:hover, .recipient-button:hover {
+  background-color: #f1f1f1;
+  transform: translateY(-2px);
+}
+
+.button-content .label {
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--text-primary);
+  font-family: 'CyberLife';
+}
+
+.address-details {
+  font-size: 14px;
+  color: #666;
+}
+
+.arrow-icon {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  transition: transform 0.3s;
+}
+
+.arrow-icon svg {
+  transition: transform 0.3s ease-in-out;
+}
+
+.delivery-point-button:hover .arrow-icon svg,
+.recipient-button:hover .arrow-icon svg {
+  transform: translateX(4px);
+}
+
+.recipient-details {
+  font-size: 14px;
+  color: #666;
+}
+
+.recipient-details .name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.recipient-details .contact-info {
+  color: #888;
+}
+
+#recipient-selector {
+  margin-top: 10px;
+  padding: 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+/* Основной контейнер для страницы */
+.checkoutContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+}
+
+.checkoutContainer .leftBlock {
+  flex: 1;
+  min-width: 280px;
+}
+
+.checkoutContainer .delivery-options {
+  display: flex;
+  column-gap: 16px;
+  flex: 1;
+  margin: 0 auto;
+  width: fit-content;
+}
+
+/* Карточка для выбора типа доставки */
+.checkoutContainer .delivery-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+  width: 230px;
+  position: relative;
+  cursor: pointer;
+  transition: box-shadow 0.3s ease, transform 0.3s ease, background-color 0.3s;
+}
+
+/* Когда карточка выбрана */
+.checkoutContainer .delivery-card.checked {
+  border: 2px solid #007bff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+.checkoutContainer .delivery-card.disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+/* Стили для хедера карточки */
+.checkoutContainer .delivery-card-header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 88px;
+}
+
+/* Стили для карточек товаров */
+.checkoutContainer #checkout-grid .card {
+  margin: 10px 0;
+  border: 1px solid;
+  border-radius: 10px;
+  background-color: var(--bg-secondary);
+}
+
+.amount {
+  float: right;
+  border: 1px solid;
+  padding: 5px 5px;
+  border-radius: 5px 10px 0px 15px;
+  margin: -1px;
+  font-family: 'CyberLife';
+}
+
+.checkoutContainer > .leftBlock > .deliveryBlock {
+  background-color: var(--bg-secondary);
+  padding: 10px;
+  border-radius: 10px;
+}
+
+/* Стили для изображения в карточке */
+.checkoutContainer #checkout-grid .card .imgWrapper {
+  width: 70px;
+  min-width: 70px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 7px;
+}
+
+.checkoutContainer #checkout-grid .card .imgWrapper img {
+  max-width: 128px;
+  max-height: 128px;
+}
+
+.checkoutContainer .delivery-details {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Стили для переключателей */
+.checkoutContainer .delivery-options-switch {
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.checkoutContainer .switch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkoutContainer .switcher {
+  width: 40px;
+}
+
+/* Стили для блока с итогами */
+.checkoutContainer .cart-summary {
+  background: #f9f9f9;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.checkoutContainer .cart-summary__line {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.checkoutContainer .cart-summary__line--items .cart-summary__label {
+  font-weight: bold;
+}
+
+.checkoutContainer .cart-summary__line--delivery .cart-summary__label {
+  font-weight: bold;
+}
+
+.checkoutContainer .cart-summary__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.checkoutContainer .total-line {
+  display: flex;
+  justify-content: space-between;
+}
+
+.checkoutContainer .total-price .price-main {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.checkoutContainer .btn-checkout {
+  background-color: #ff8000;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 16px;
+  transition: background-color 0.3s;
+}
+
+.checkoutContainer .btn-checkout:hover {
+  background-color: #e67700;
+}
+
+/* Добавляем стили для hover на карточках */
+.checkoutContainer .delivery-card:not(.disabled):hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Стили для каждой карточки */
+.checkoutContainer .checkoutGridWrapper {
+  margin: 15px;
+}
+
+.checkoutContainer .delivery-price {
+  font-size: 12px;
+  color: #28a745;
+}
+
+/* Скрываем радиокнопку */
+.checkoutContainer .radio-input {
+  display: none;
+}

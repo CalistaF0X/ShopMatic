@@ -97,6 +97,13 @@
   right: 15px;
   width: 24px;
   height: 24px;
+  z-index: 3;
+}
+
+.card__media .fav-btn:hover {
+	background: transparent;
+	border: none;
+	box-shadow: none;
 }
 
 .card__media .btn:hover{
@@ -175,15 +182,25 @@
   font-size:14px;
 }
 
+.filters-row #resetFilters {
+    height: -webkit-fill-available;
+    background: #ff7200;
+    color: #fff;
+    padding: 0 14px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    
+    box-shadow: 0 0 4px rgba(255, 115, 0, 0.45);
+}
+
 /* grid */
 #catalog .grid{
   display:grid;
   gap:5px;
-  grid-template-columns
-specifies, as a space-separated track list, the line names and track sizing functions of the grid.
-Learn more
-
-Don't show: repeat(4, 1fr);';
+  grid-template-columns: repeat(4, 1fr);';
 }
 
 /* --- card (strict, modern Apple-like) --- */
@@ -269,7 +286,7 @@ Don't show: repeat(4, 1fr);';
 }
 
 /* small top-left labels (sold/new) - thin and subtle */
-.label{
+#catalog .label{
   position:absolute;
   top:12px;
   left:12px;
@@ -371,6 +388,7 @@ height: 80px;
 
 .card__media img {
   width: 100%;
+  margin: 5px;
   display: block;
   transition: opacity .3s ease, transform .4s ease;
   will-change: opacity, transform;

@@ -16,15 +16,51 @@ export function debounce(fn, ms = 200) {
   };
 }
 
-export function formatPrice(n) {
-  return Number(n || 0).toLocaleString('ru-RU') + ' ₽';
+/**
+ * Возвращает правильное слово в зависимости от числа
+ * @param {number} n — число
+ * @param {string[]} forms — массив из трёх форм [1, 2, 5]
+ * Пример: pluralize(5, ['товар', 'товара', 'товаров']) → "товаров"
+ */
+export function pluralize(n, forms) {
+  n = Math.abs(n) % 100;
+  const n1 = n % 10;
+  if (n > 10 && n < 20) return forms[2];
+  if (n1 > 1 && n1 < 5) return forms[1];
+  if (n1 === 1) return forms[0];
+  return forms[2];
 }
+
 
 export function computeDiscountPercent(p) {
   if (!p || typeof p.oldPrice !== 'number') return 0;
   if (p.oldPrice <= p.price) return 0;
   const percent = Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100);
   return Math.max(0, percent);
+}
+/**
+ * Форматирует цену с учетом валюты.
+ * @param {number} amount Сумма, которую нужно отформатировать.
+ * @param {string} currency Код валюты (например, 'USD', 'EUR', 'RUB').
+ * @returns {string} Отформатированная строка с ценой.
+ */
+export function formatPrice(amount, currency = 'RUB') {
+  // Убедимся, что сумма является числом
+  if (isNaN(amount) || amount === null) {
+    throw new Error('Invalid amount');
+  }
+
+  // Определим настройки для валюты
+  const options = {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: 2,  // отображать минимум 2 знака после запятой
+    maximumFractionDigits: 2   // отображать максимум 2 знака после запятой
+  };
+
+  // Форматируем сумму с использованием Intl.NumberFormat
+  const formatter = new Intl.NumberFormat('ru-RU', options);
+  return formatter.format(amount);
 }
 
 /**

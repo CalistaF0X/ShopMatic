@@ -3,6 +3,7 @@ import { escapeHtml as _escapeHtml, makeSpecHtmlPreview, formatPrice, computeDis
 /**
  * Renderer
  * Улучшенная версия рендера карточек/корзины/мини-карточек
+ * @author Calista Verner
  *
  * Данное переосмысление направлено на улучшение ООП-организации кода,
  * оптимизацию процессов построения DOM и уменьшение повторяющихся

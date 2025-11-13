@@ -1,9 +1,9 @@
 /**
  * FavoritesModule for ShopMatic
  *
- * Author: Calista Verner
- * Version: 1.3.0
- * Date: 2025-10-14
+ * @author Calista Verner
+ * Version: 1.4.0
+ * Date: 2025-11-04
  * License: MIT
  *
  * Responsibilities:
@@ -15,83 +15,62 @@
  *
  */
 export class FavoritesModule {
-  /**
-   * @param {object} params.storage - объект-хранилище с методами loadFavs() и saveFavs(iterable)
-   * @param {object} [params.opts]
-   * @param {number} [params.opts.max] - максимальное число избранного (0 = без лимита)
-   * @param {('reject'|'drop_oldest')} [params.opts.overflow='reject'] - поведение при достижении лимита
-   * @param {boolean} [params.opts.sync=true] - слушать window.storage для синхронизации вкладок
-   * @param {number} [params.opts.saveDebounceMs=200] - дебаунс для сохранения
-   * @param {Array|string[]} [params.opts.initial] - начальные id (опционально)
-   * @param {string} [params.opts.storageKey] - (опционально) ключ storage, если storage не предоставляет его
-   */
   constructor({ storage, opts = {} } = {}) {
     if (!storage || typeof storage.loadFavs !== 'function' || typeof storage.saveFavs !== 'function') {
       throw new Error('FavoritesModule requires storage with loadFavs() and saveFavs() methods');
     }
 
     this.storage = storage;
-    this._max = Number.isFinite(opts.max) && opts.max > 0 ? Math.floor(opts.max) : 0;
-    this._overflow = (opts.overflow === 'drop_oldest') ? 'drop_oldest' : 'reject';
+    this._max = Math.max(0, Number.isFinite(opts.max) ? Math.floor(opts.max) : 0);
+    this._overflow = opts.overflow === 'drop_oldest' ? 'drop_oldest' : 'reject';
     this._sync = opts.sync !== undefined ? Boolean(opts.sync) : true;
-    this._saveDebounceMs = Number.isFinite(opts.saveDebounceMs) ? Math.max(0, opts.saveDebounceMs) : 200;
-
-    // optional explicit storage key to listen for cross-tab events; fallback to storage.favStorageKey
+    this._saveDebounceMs = Math.max(0, Number.isFinite(opts.saveDebounceMs) ? opts.saveDebounceMs : 200);
     this._storageKey = opts.storageKey || this.storage.favStorageKey || this.storage.storageKey || null;
-
-    // internal structures: array preserves insertion order, set — O(1) lookup
-    this._list = [];      // ['id1','id2', ...] — newest appended at end
-    this._set = new Set(); // mirrors _list
-
-    // subscribers: functions(event)
+    this._list = [];
+    this._set = new Set();
     this._subs = new Set();
-
-    // debounce timer
     this._saveTimer = null;
     this._destroyed = false;
-
-    // bind handler
     this._onStorageEvent = this._onStorageEvent.bind(this);
 
-    // optionally load initial list (persist=false to avoid writing immediately)
     if (Array.isArray(opts.initial) && opts.initial.length) {
       this.importFromArray(opts.initial, { replace: true, persist: false });
     }
 
-    // load from storage (try/catch)
-    //this.loadFromStorage();
-
-    // auto-sync across tabs
     if (this._sync && typeof window !== 'undefined' && window.addEventListener) {
       window.addEventListener('storage', this._onStorageEvent);
     }
   }
 
-  /* ===================== internal helpers ===================== */
+  // --- Internal Helpers ---
 
+  /**
+   * Emit an event to all subscribers.
+   * @private
+   */
   _emit(event) {
-    // event: { type, id = null, reason? }
     const payload = {
       type: event.type,
-      id: event.id === undefined ? null : event.id,
-      reason: event.reason === undefined ? null : event.reason,
+      id: event.id || null,
+      reason: event.reason || null,
       list: this.exportToArray(),
-      count: this.getCount()
+      count: this.getCount(),
     };
-    for (const cb of Array.from(this._subs)) {
+    for (const cb of this._subs) {
       try {
         cb(payload);
       } catch (e) {
-        // подписчики не должны ломать модуль
-        // eslint-disable-next-line no-console
         console.warn('FavoritesModule subscriber error', e);
       }
     }
   }
 
+  /**
+   * Schedule the save to storage with debounce.
+   * @private
+   */
   _scheduleSave() {
     if (this._saveDebounceMs <= 0) {
-      // immediate
       this._doSave();
       return;
     }
@@ -102,166 +81,113 @@ export class FavoritesModule {
     }, this._saveDebounceMs);
   }
 
+  /**
+   * Perform the actual save to storage.
+   * @private
+   */
   async _doSave() {
     try {
-      // save array — preserves order in storage
-      const res = this.storage.saveFavs(this._list);
-      // поддержка промисов на случай асинхронного storage
-      if (res && typeof res.then === 'function') await res;
+      const result = this.storage.saveFavs(this._list);
+      if (result && typeof result.then === 'function') await result;
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn('FavoritesModule: save to storage failed', e);
     }
   }
 
-_normalizeId(id) {
-  if (id === null || id === undefined) return null;
-  try {
-    // если передали объект с полями, попробуем извлечь его идентификатор
-    if (typeof id === 'object') {
-      const candidate = id.name ?? id.id ?? id.productId ?? id._missingId ?? null;
-      if (candidate === null || candidate === undefined) return null;
-      const s = String(candidate).trim();
-      return s === '' ? null : s;
-    }
-    const s = String(id).trim();
-    return s === '' ? null : s;
-  } catch (e) {
-    return null;
+  /**
+   * Normalize an ID into a string.
+   * @private
+   */
+  _normalizeId(id) {
+    if (id === null || id === undefined) return null;
+    const candidate = id?.name || id?.id || id?.productId || id?._missingId || id;
+    const str = String(candidate).trim();
+    return str === '' ? null : str;
   }
-}
 
-
+  /**
+   * Apply truncation when exceeding max limit.
+   * @private
+   */
   _applyMaxTruncate() {
-    if (this._max <= 0) return false;
-    if (this._list.length <= this._max) return false;
-    // keep last _max elements (assume newest at end)
+    if (this._max <= 0 || this._list.length <= this._max) return false;
     this._list = this._list.slice(-this._max);
     this._set = new Set(this._list);
     return true;
   }
 
-  /* ===================== persistence ===================== */
+  // --- Public Methods ---
 
   /**
-   * Загружает фавориты из storage и обновляет внутреннее состояние.
-   * Возвращает текущий массив (копия).
+   * Load favorites from storage and update the internal list.
    */
-async loadFromStorage() {
-  try {
-    // сначала попробуем более "богатый" метод, если он есть; иначе — базовый loadFavs()
-    let raw;
-    if (typeof this.storage.loadFavsWithAvailability === 'function') {
-      raw = await this.storage.loadFavsWithAvailability();
-    } else if (typeof this.storage.loadFavs === 'function') {
-      raw = await this.storage.loadFavs();
-    } else {
-      // ничего не делать — storage контракт был проверен в конструкторе, но на всякий случай
-      raw = null;
-    }
+  async loadFromStorage() {
+    try {
+      const raw = await (this.storage.loadFavsWithAvailability ? this.storage.loadFavsWithAvailability() : this.storage.loadFavs());
+      const normalized = this._normalizeList(raw);
+      this._list = normalized;
+      this._set = new Set(normalized);
 
-    // debug: не выводим в prod консоль, но можно включить логи через опцию (не реализовано здесь)
-     console.log('FavoritesModule.loadFromStorage raw:', raw);
-
-    if (!Array.isArray(raw)) {
-      // nothing or invalid — keep current list if present, else empty
-      if (!this._list.length) {
-        this._list = [];
-        this._set = new Set();
-      }
+      if (this._applyMaxTruncate()) this._scheduleSave();
       this._emit({ type: 'load', id: null });
       return this.exportToArray();
+    } catch (e) {
+      console.warn('FavoritesModule.loadFromStorage error', e);
+      return this.exportToArray();
     }
-
-    // нормализуем: поддерживаем случаи, когда элемент — строка или объект { name, ... }
-    const normalized = [];
-    const seen = new Set();
-    for (const el of raw) {
-      try {
-        // если элемент — объект, выберем возможные поля-идентификаторы
-        const candidate = (typeof el === 'object' && el !== null)
-          ? (el.name ?? el.id ?? el.productId ?? el._missingId ?? null)
-          : el;
-        const sid = this._normalizeId(candidate);
-        if (!sid) continue;
-        if (seen.has(sid)) continue;
-        seen.add(sid);
-        normalized.push(sid);
-      } catch { /* skip invalid */ }
-    }
-
-    this._list = normalized;
-    this._set = new Set(normalized);
-
-    // если есть лимит — обрезаем старые элементы (с начала) чтобы сохранить последние добавленные
-    if (this._applyMaxTruncate()) {
-      // persist truncated version
-      this._scheduleSave();
-    }
-
-    this._emit({ type: 'load', id: null });
-    return this.exportToArray();
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn('FavoritesModule.loadFromStorage error', e);
-    return this.exportToArray();
   }
-}
-
 
   /**
-   * Принудительная синхронная запись в storage (без дебаунса)
+   * Save the current list immediately.
    */
   saveToStorage() {
     if (this._destroyed) return;
-    if (this._saveTimer) {
-      clearTimeout(this._saveTimer);
-      this._saveTimer = null;
-    }
-    // не ждём результат — сохраняем и продолжаем
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+    this._saveTimer = null;
     this._doSave();
   }
 
-  /* ===================== public API ===================== */
-
+  /**
+   * Check if an ID is in favorites.
+   */
   has(id) {
     return this.isFavorite(id);
   }
 
+  /**
+   * Check if an ID is in favorites.
+   */
   isFavorite(id) {
-    const sid = this._normalizeId(id);
-    if (!sid) return false;
-    return this._set.has(sid);
+    return this._set.has(this._normalizeId(id));
   }
 
+  /**
+   * Get all favorite IDs as an array.
+   */
   getAll() {
-    // возвращаем копию (по умолчанию — от старых к новым)
-    return Array.from(this._list);
+    return [...this._list];
   }
 
+  /**
+   * Get the number of favorites.
+   */
   getCount() {
     return this._list.length;
   }
 
   /**
-   * Добавить элемент. Возвращает true если добавлен, false если уже был или отказано (лимит/ошибка).
-   * При overflow === 'drop_oldest' будет удалять старейший элемент и добавлять новый.
+   * Add an item to favorites.
    */
   add(id) {
     if (this._destroyed) return false;
     const sid = this._normalizeId(id);
-    if (!sid) return false;
-
-    if (this._set.has(sid)) return false;
+    if (!sid || this._set.has(sid)) return false;
 
     if (this._max > 0 && this._list.length >= this._max) {
       if (this._overflow === 'drop_oldest') {
-        // удаляем самый старый (с начала)
         const removed = this._list.shift();
         if (removed !== undefined) this._set.delete(removed);
-        // продолжаем добавление
       } else {
-        // reject
         this._emit({ type: 'limit', id: sid, reason: 'limit_reached' });
         return false;
       }
@@ -275,15 +201,13 @@ async loadFromStorage() {
   }
 
   /**
-   * Удалить элемент. Возвращает true если удалён, false если не найден.
+   * Remove an item from favorites.
    */
   remove(id) {
     if (this._destroyed) return false;
     const sid = this._normalizeId(id);
-    if (!sid) return false;
-    if (!this._set.has(sid)) return false;
+    if (!sid || !this._set.has(sid)) return false;
 
-    // удалить из массива и сет
     this._list = this._list.filter(x => x !== sid);
     this._set.delete(sid);
     this._scheduleSave();
@@ -292,27 +216,20 @@ async loadFromStorage() {
   }
 
   /**
-   * Переключает состояние. Возвращает true если после вызова элемент находится в favs, false если не в favs.
+   * Toggle an item's presence in favorites.
    */
   toggle(id) {
     if (this._destroyed) return false;
-    const sid = this._normalizeId(id);
-    if (!sid) return false;
-    if (this._set.has(sid)) {
-      this.remove(sid);
-      return false;
-    } else {
-      const ok = this.add(sid);
-      return Boolean(ok);
-    }
+    return this.isFavorite(id) ? this.remove(id) : this.add(id);
   }
 
   /**
-   * Очищает избранное
+   * Clear all favorites.
    */
   clear() {
     if (this._destroyed) return;
-    if (this._list.length === 0) return;
+    if (!this._list.length) return;
+
     this._list = [];
     this._set.clear();
     this._scheduleSave();
@@ -320,117 +237,110 @@ async loadFromStorage() {
   }
 
   /**
-   * Импорт массива id.
-   * opts.replace = true  -> заменить текущую коллекцию новым массивом
-   * opts.persist = true|false -> вызвать сохранение в storage (по умолчанию true)
-   * Возвращает итоговый массив.
+   * Import a list of IDs into the favorites.
    */
   importFromArray(arr = [], { replace = false, persist = true } = {}) {
     if (!Array.isArray(arr)) return this.exportToArray();
-    const normalized = [];
-    const seen = new Set();
-    for (const el of arr) {
-      const sid = this._normalizeId(el);
-      if (!sid) continue;
-      if (seen.has(sid)) continue;
-      seen.add(sid);
-      normalized.push(sid);
-    }
+
+    const normalized = this._normalizeList(arr);
     if (replace) {
-      // respect max: keep last _max if needed
-      let final = normalized;
-      if (this._max > 0 && final.length > this._max) final = final.slice(-this._max);
-      this._list = final;
-      this._set = new Set(final);
+      this._list = normalized.slice(-this._max);
+      this._set = new Set(this._list);
     } else {
-      // add missing preserving existing order
-      for (const sid of normalized) {
-        if (this._set.has(sid)) continue;
-        if (this._max > 0 && this._list.length >= this._max) {
-          if (this._overflow === 'drop_oldest') {
-            // remove oldest to make room
-            const removed = this._list.shift();
-            if (removed !== undefined) this._set.delete(removed);
-          } else {
-            break; // stop adding
+      normalized.forEach(sid => {
+        if (!this._set.has(sid)) {
+          if (this._max > 0 && this._list.length >= this._max) {
+            if (this._overflow === 'drop_oldest') {
+              const removed = this._list.shift();
+              if (removed !== undefined) this._set.delete(removed);
+            } else {
+              return;
+            }
           }
+          this._list.push(sid);
+          this._set.add(sid);
         }
-        this._list.push(sid);
-        this._set.add(sid);
-      }
+      });
     }
     if (persist) this._scheduleSave();
     this._emit({ type: 'import', id: null });
     return this.exportToArray();
   }
 
-  exportToArray() {
-    return Array.from(this._list);
+  /**
+   * Normalize and deduplicate a list of IDs.
+   * @private
+   */
+  _normalizeList(arr) {
+    const seen = new Set();
+    return arr.reduce((normalized, el) => {
+      const sid = this._normalizeId(el);
+      if (sid && !seen.has(sid)) {
+        seen.add(sid);
+        normalized.push(sid);
+      }
+      return normalized;
+    }, []);
   }
 
   /**
-   * Подписка на события изменений.
-   * cb(event) — получает { type, id, list, count }
-   * Возвращает функцию отписки.
+   * Return a copy of the favorites array.
+   */
+  exportToArray() {
+    return [...this._list];
+  }
+
+  /**
+   * Subscribe to favorites events.
    */
   subscribe(cb, { immediate = true } = {}) {
     if (typeof cb !== 'function') throw new Error('subscribe requires a function');
     this._subs.add(cb);
-    // немедленно отправить текущее состояние
     if (immediate) {
-      try { cb({ type: 'load', id: null, list: this.exportToArray(), count: this.getCount() }); } catch (e) {}
+      cb({ type: 'load', id: null, list: this.exportToArray(), count: this.getCount() });
     }
-    return () => { this._subs.delete(cb); };
+    return () => this._subs.delete(cb);
   }
-
-  /* ===================== cross-tab sync ===================== */
-
-async _onStorageEvent(e) {
-  try {
-    if (!e) return;
-    const favKey = this._storageKey || (this.storage && (this.storage.favStorageKey || this.storage.storageKey)) || null;
-    if (!favKey) return;
-
-    // если ключ совпадает (или null при clear) — перезагрузим список и дождёмся результата
-    if (e.key === null || e.key === String(favKey) || e.key === favKey) {
-      const prev = this.exportToArray();
-      await this.loadFromStorage(); // теперь ждём завершения
-      const curr = this.exportToArray();
-      const changed = prev.length !== curr.length || prev.some((v, i) => v !== curr[i]);
-      if (changed) this._emit({ type: 'sync', id: null });
-    }
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn('FavoritesModule._onStorageEvent error', err);
-  }
-}
-
-
-  /* ===================== lifecycle ===================== */
 
   /**
-   * Перестаёт слушать storage и отменяет отложенные операции.
+   * Respond to storage events (cross-tab sync).
+   * @private
+   */
+  async _onStorageEvent(e) {
+    const favKey = this._storageKey || (this.storage && this.storage.favStorageKey) || null;
+    if (e?.key === favKey) {
+      const prev = this.exportToArray();
+      await this.loadFromStorage();
+      const curr = this.exportToArray();
+      if (prev.length !== curr.length || prev.some((v, i) => v !== curr[i])) {
+        this._emit({ type: 'sync', id: null });
+      }
+    }
+  }
+
+  /**
+   * Destroy the module and clear all timers and listeners.
    */
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
-	
-    if (this._saveTimer) {
-      clearTimeout(this._saveTimer);
-      this._saveTimer = null;
-    }
-    if (this._sync && typeof window !== 'undefined' && window.removeEventListener) {
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+    if (this._sync && window.removeEventListener) {
       window.removeEventListener('storage', this._onStorageEvent);
     }
     this._subs.clear();
   }
 
-  /* ===================== convenience iterators ===================== */
-
+  /**
+   * Iterate over the favorites list (yields IDs).
+   */
   [Symbol.iterator]() {
     return this._list[Symbol.iterator]();
   }
 
+  /**
+   * Return a new Set containing all favorites.
+   */
   toSet() {
     return new Set(this._set);
   }

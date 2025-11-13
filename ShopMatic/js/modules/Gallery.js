@@ -1,5 +1,6 @@
-/*
+/**
  * Enhanced and optimized version of the Gallery class.
+ * @author Calista Verner
  *
  * This implementation focuses on improving performance and reducing memory
  * overhead by adopting event delegation for thumbnail interaction and

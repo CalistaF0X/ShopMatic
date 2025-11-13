@@ -52,6 +52,17 @@
   100% { opacity: 0; transform: translateY(-26px) translateX(12px) scale(0.88) rotate(-1.6deg); filter: blur(6px); }
 }
 
+.blockSummary {
+    flex: 0 0 340px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-soft);
+    padding: 22px;
+    position: sticky;
+    top: 24px;
+    transition: all 0.3s ease;
+}
+
 /* ---------- MEDIA ---------- */
 
 /* Use aspect-ratio where available */
@@ -60,6 +71,18 @@
 .card__media img:hover,
 .wish-media img:hover {
   transform: scale(1.02);
+}
+
+.btn:hover {
+    background: #ffa552;
+    box-shadow: 0 0 6px rgba(255, 140, 0, 0.55), 0 0 18px rgba(255, 115, 0, 0.35);
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0);
+    background: #e86400;
+    box-shadow: 0 0 4px rgba(255, 115, 0, 0.45);
 }
 
 /* ---------- BODY ---------- */
@@ -82,15 +105,7 @@
 }
 
 /* ---------- PRICE BLOCK ---------- */
-/*
-.price-block {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  min-width: 110px;
-  text-align: right;
-} */
+
 .badge {
   font-size: 12px;
   color: #fff;
@@ -119,6 +134,22 @@
   align-items: center;
   margin-top: 12px;
   flex-wrap: wrap;
+}
+
+.price-submain {
+	font-size: 15px;
+    font-weight: 700;
+    color: var(--price-term);
+    font-family: 'FSElliotPro';
+    margin: 10px;
+}
+
+.price-main {
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--price-term);
+	font-family: 'FSElliotPro-Heavy';
+	margin: 10px;
 }
 
 /* qty control */

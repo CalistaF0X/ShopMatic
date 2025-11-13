@@ -1,6 +1,6 @@
 /**
  * WishlistModule (class)
- * Author: Calista Verner (adapted)
+ * @author Calista Verner
  * Version: 1.0.0
  */
 export class WishlistModule {
@@ -301,13 +301,17 @@ export class WishlistModule {
         this._log('optimistic remove succeeded', id);
       } else {
         const ok = await this.removeFromFav(id);
-        if (!ok) throw new Error('remove returned false');
+        if (!ok) {
+			throw new Error('remove returned false');
+		}
       }
     } catch (e) {
       this._error('optimisticRemoveUI failed', e);
       this.notify(this.config.ui.removeFailedRefresh, { type: 'error' });
       this.refresh(true);
     }
+	this.recalcCount();
+	this.removeFromFav(id);
   }
 
   /* ---------- availability refresh (cart updates) ---------- */
@@ -622,7 +626,7 @@ export class WishlistModule {
     // delegate remove button in grid (fallback cards)
     this._gridClickHandler = (ev) => {
       const t = ev.target;
-      const rem = t.closest && t.closest('[data-action="fav-remove"], .wish-remove');
+      const rem = t.closest && t.closest('[data-role="fav"], .wish-remove');
       if (rem && this.grid && this.grid.contains(rem)) {
         ev.stopPropagation();
         const card = rem.closest && rem.closest('[data-product-id]');

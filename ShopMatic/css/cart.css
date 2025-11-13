@@ -189,7 +189,7 @@
   border-radius: 10px;
   background: #dfd3d36e; /* if you want neutral, override with var(--muted) elsewhere */
   overflow: hidden;
-  gap: 6px;
+  gap: 3px;
   width: fit-content;
   align-items: center;
 }
@@ -347,7 +347,6 @@
 .cart-summary__total { display: flex; flex-direction: column; gap: 8px; }
 .total-line { display: flex; justify-content: space-between; align-items: center; }
 .total-title { font-size: 18px; font-weight: 700; }
-.price-main {font-size: 22px;font-weight: 700;color: var(--price-term);}
 .currency { font-size: 18px; margin-left: 4px; color: var(--text-secondary); }
 
 /* Checkout button */

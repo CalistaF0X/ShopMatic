@@ -1,7 +1,7 @@
 /**
  * Cart module for ShopMatic
  *
- * Author: Calista Verner
+ * @author Calista Verner
  * Version: 1.3.2
  * Date: 2025-10-28
  * License: MIT
@@ -100,6 +100,10 @@ export class CartModule {
       const key = this._normalizeIdKey(this.cart[i].name);
       if (key) this._idIndex.set(key, i);
     }
+  }
+  
+  getCartItems () {
+	  return this.cart;
   }
 
   _updateIndexOnInsert(id, index) {
@@ -939,6 +943,18 @@ export class CartModule {
     this._emitUpdateEvent();
 
     return { cart: this.getCart(), totalCount, totalSum };
+  }
+  
+  /**
+   * Проверяет доступность товара по его id.
+   * Учитывает количество товара в корзине и его наличие на складе.
+   * @param {string} id - Идентификатор товара
+   * @returns {boolean} - Доступность товара (true если доступен, false если нет)
+   */
+  isAvailable(item) {
+    const stock = Number(item.stock);
+    const qtyInCart = this._getCartQtyById(item.name);
+    return stock > 0 && qtyInCart < stock;
   }
 
   _findAllRowsByIdInGrid(id) {

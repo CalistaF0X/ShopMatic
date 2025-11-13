@@ -1,0 +1,93 @@
+#top-second-section {
+  font-family: 'Roboto', sans-serif;
+  display: flex;
+  gap: 16px;
+  margin: 0 auto;
+  max-width: 1200px;
+}
+
+.checkoutContainer .delivery-card:not(.disabled) .delivery-label {
+    cursor: pointer;
+}
+
+.checkoutContainer .delivery-card.disabled .delivery-label {
+    cursor: not-allowed;
+}
+
+.checkoutContainer .delivery-description {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+
+/* Добавляем стили для hover на карточках */
+
+/* Стили для каждой карточки */
+.checkoutContainer .delivery-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 90px;
+}
+
+.checkoutContainer .delivery-title h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  font-family: 'CyberLife';
+}
+
+/* Чекмарка */
+.checkoutContainer .checkmark {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  height: 24px;
+  width: 24px;
+  background-color: rgba(68, 45, 13, 0.078);
+  border-radius: 50%;
+  box-shadow: inset 0 2px 3px rgba(68, 45, 13, 0.078);
+  transition: background-color 0.3s, transform 0.3s ease;
+  cursor: pointer;
+}
+
+/* Когда карточка выбрана */
+.checkoutContainer .delivery-card.checked .checkmark {
+  background-color: var(--control-primary);
+  box-shadow: none;
+}
+
+.checkoutContainer .delivery-card.checked .checkmark i {
+  display: block;
+}
+
+.checkoutContainer .delivery-card .checkmark i {
+  display: none;
+  margin: 4px;
+}
+
+.checkoutContainer .delivery-card:not(.disabled):hover .checkmark {
+  transform: scale(1.2);
+  background-color: var(--control-primary-hover);
+}
+
+.checkoutContainer .delivery-card.checked .checkmark {
+  background-color: var(--control-primary-hover);
+}
+
+.checkoutContainer .delivery-card.checked .checkmark:after {
+  opacity: 1;
+  transform: rotate(45deg);
+}
+
+/* Анимация на hover для чекмарки */
+.checkoutContainer .checkmark::before,
+.checkoutContainer .checkmark::after {
+  transition: opacity 0.3s, transform 0.3s ease-in-out;
+}
+
+/* Стили для адреса */
+.address-details {
+  font-size: 14px;
+  color: #666;
+}
