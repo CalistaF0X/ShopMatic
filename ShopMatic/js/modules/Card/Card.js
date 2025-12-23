@@ -2,8 +2,8 @@ import { CardDomHelper } from './card-dom-helper.js';
 import { CardStockHelper } from './card-stock-helper.js';
 import { CardCartHelper } from './card-cart-helper.js';
 import { CardDelegationManager } from './card-delegation-manager.js';
-import { VerticalCardRenderer } from "./VerticalCardRenderer.js";
-import { HorizontalCardRenderer } from "./HorizontalCardRenderer.js";
+import { VerticalCardRenderer } from "./Renderers/VerticalCardRenderer.js";
+import { HorizontalCardRenderer } from "./Renderers/HorizontalCardRenderer.js";
 
 /**
  * Card — Card factory + registry + reactive syncing via event bus + premium batching.

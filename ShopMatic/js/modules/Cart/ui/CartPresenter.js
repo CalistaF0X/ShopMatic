@@ -1,43 +1,28 @@
 /**
  * @author Calista Verner
  *
- * CartPresenter — the single orchestrator.
+ * CartPresenter — the single orchestrator (senior polish).
  * Responsibilities:
  *  - Accept actions (commands) from UI layer
  *  - Mutate domain state (CartBase) WITHOUT triggering UI side-effects
  *  - Re-render UI (grid/minicart/totals/badges)
- *  - Emit events
+ *  - Emit events (through ctx pipeline)
  *
- * UI layers (listeners/helpers) MUST call dispatch() only.
- *
- * Contract (important):
- *  - UI code MUST NOT call CartBase mutations directly.
- *    It MUST call presenter.dispatch(action) only.
- *  - Presenter mutates domain via ctx._domain* methods (no UI side-effects).
- *  - Presenter triggers exactly one UI refresh pipeline: ctx._updateCartUI(targetId).
- *  - dispatch() is re-entrancy safe: concurrent calls collapse into the same pipeline.
- *
- * Supported actions (type is case-insensitive):
- *  - { type:'ADD', id, qty? }
- *  - { type:'REMOVE', id }
- *  - { type:'QTY_SET', id, qty, sourceRow? }
- *  - { type:'QTY_INC', id, sourceRow? }
- *  - { type:'QTY_DEC', id, sourceRow? }  // can reach 0 => domain removes
- *  - { type:'INCLUDE_SET', id, included }
- *  - { type:'INCLUDE_ALL', included }
- *  - { type:'FAV_TOGGLE', id }
- *
- * return value:
- *  - dispatch() resolves to CartStateSnapshot (from ctx._updateCartUI).
+ * Key improvements:
+ *  - Queues updates while pipeline running (no re-entrancy storms)
+ *  - Coalesces targetId safely
  */
-
 export class CartPresenter {
   /**
-   * @param {any} ctx CartUI (extends CartBase in your project)
+   * @param {any} ctx CartUI (extends CartBase)
    */
   constructor(ctx) {
     this.ctx = ctx;
     this._updating = false;
+
+    // queued refresh request while updating
+    this._queued = false;
+    this._queuedTargetId = null; // null => global
   }
 
   /**
@@ -94,9 +79,10 @@ export class CartPresenter {
         if (!targetId) return null;
         const included = !!action.included;
         c.included?.set?.(targetId, included, { immediateSave: true, reason: 'include_set' });
-        // reflect on item if exists (still not "cart logic", just state projection)
         const it = c._getCartItemById?.(targetId);
         if (it) it.included = included;
+        // If you want strict totals correctness on include change, set:
+        // targetId = null;
         break;
       }
 
@@ -109,7 +95,6 @@ export class CartPresenter {
 
       case 'FAV_TOGGLE': {
         if (!targetId) return null;
-        // Favorites is external module; presenter triggers and then updates UI via Card event system.
         try {
           const res = c.favorites?.toggle?.(targetId);
           if (res && typeof res.then === 'function') await res.catch(() => {});
@@ -127,13 +112,26 @@ export class CartPresenter {
 
   /**
    * The only UI refresh pipeline.
+   * Queues if pipeline is already running.
    * @param {string|null} targetId
    */
   async updateUI(targetId = null) {
     const c = this.ctx;
+
     if (this._updating) {
-      // Collapse into a normal update; avoid re-entrancy storms.
-      return c._updateCartUI(targetId);
+      this._queued = true;
+
+      // Coalesce:
+      // - if any caller requests global (null) => global wins
+      // - else keep first queued id (cheap and stable)
+      if (targetId == null) this._queuedTargetId = null;
+      else if (this._queuedTargetId == null) {
+        // keep global
+      } else if (!this._queuedTargetId) {
+        this._queuedTargetId = targetId;
+      }
+
+      return null;
     }
 
     this._updating = true;
@@ -141,6 +139,17 @@ export class CartPresenter {
       return await c._updateCartUI(targetId);
     } finally {
       this._updating = false;
+
+      if (this._queued) {
+        const nextTarget = this._queuedTargetId;
+        this._queued = false;
+        this._queuedTargetId = null;
+
+        // run one more refresh, safely
+        try {
+          await c._updateCartUI(nextTarget);
+        } catch {}
+      }
     }
   }
 }

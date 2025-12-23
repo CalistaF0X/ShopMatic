@@ -1,17 +1,21 @@
 /**
  * @author Calista Verner
  *
- * IncludedStates — isolated "included" state service.
+ * IncludedStates — isolated "included" state service (senior polish).
  * Responsibilities:
  *  - Persist/retrieve included map from localStorage
  *  - Apply included state to provided items (optional)
- *  - Emit "included:changed" via eventBus (if present)
+ *  - Emit canonical events via eventBus (if present)
  *
  * IMPORTANT:
  *  - No cart mutations besides setting item.included when asked to apply
  *  - No UI orchestration (does NOT call updateCartUI)
  */
 export class IncludedStates {
+  static EVENTS = Object.freeze({
+    DOMAIN_INCLUDED_CHANGED: 'domain.included.changed'
+  });
+
   /**
    * @param {object} ctx
    * @param {object} [opts]
@@ -19,6 +23,7 @@ export class IncludedStates {
    * @param {any}    [opts.eventBus]
    * @param {boolean}[opts.defaultIncluded]
    * @param {boolean}[opts.debug]
+   * @param {{ DOMAIN_INCLUDED_CHANGED?:string }} [opts.events]
    */
   constructor(ctx, opts = {}) {
     this.ctx = ctx || null;
@@ -33,14 +38,16 @@ export class IncludedStates {
 
     this._debug = !!opts.debug;
 
+    // event names can be overridden (canonical only)
+    const E = this.constructor.EVENTS;
+    this._events = Object.freeze({
+      DOMAIN_INCLUDED_CHANGED: String(opts.events?.DOMAIN_INCLUDED_CHANGED || E.DOMAIN_INCLUDED_CHANGED)
+    });
+
     this._map = null; // lazy
     this._saveTimer = null;
     this._saveDelay = 150;
   }
-
-  // ---------------------------------------------------------------------------
-  // Map basics
-  // ---------------------------------------------------------------------------
 
   _normalizeIdKey(id) {
     const c = this.ctx;
@@ -102,16 +109,11 @@ export class IncludedStates {
   }
 
   _emitChanged(payload) {
-    try {
-      this.eventBus?.emit?.('included:changed', payload);
-    } catch (e) {
-      this.ctx?._logError?.('[IncludedStates] emit failed', e);
+    // emit canonical only
+    try { this.eventBus?.emit?.(this._events.DOMAIN_INCLUDED_CHANGED, payload); } catch (e) {
+      this.ctx?._logError?.('[IncludedStates] emit domain failed', e);
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Public API
-  // ---------------------------------------------------------------------------
 
   /**
    * Get included flag for id. Falls back to defaultIncluded if absent.
@@ -126,15 +128,14 @@ export class IncludedStates {
   }
 
   /**
-   * Alias for compatibility with old code.
+   * Apply included flag to a single item (pure projection).
    * @param {any} item
-   * @returns {boolean}
+   * @returns {boolean} included
    */
-  ensureItemIncluded(item) {
-    if (!item) return false;
+  applyToItem(item) {
+    if (!item) return this.defaultIncluded;
     const key = this._normalizeIdKey(item?.name ?? item?.id);
     const val = this.get(key);
-    // It’s allowed to set the flag on item when asked for it (no cart logic duplication)
     item.included = !!val;
     return !!val;
   }
@@ -165,7 +166,6 @@ export class IncludedStates {
     else this._scheduleWrite();
 
     this._emitChanged({ id: key, included: next, prev, reason: opts.reason || 'set' });
-
     return true;
   }
 
@@ -298,7 +298,7 @@ export class IncludedStates {
 
     let included = 0;
     for (const it of cart) {
-      const v = it?.included !== undefined ? !!it.included : this.ensureItemIncluded(it);
+      const v = it?.included !== undefined ? !!it.included : this.applyToItem(it);
       if (v) included++;
     }
 
@@ -318,41 +318,18 @@ export class IncludedStates {
   }
 
   /**
-   * Backward-compatible wrapper for old CartDOMRefs/CartUI code.
-   * @param {boolean} val
-   * @returns {boolean}
+   * Convenience: persist map based on current ctx.cart projection.
    */
-  toggleAllIncluded(val) {
-    const c = this.ctx;
-    const cart = Array.isArray(c?.cart) ? c.cart : [];
-    return this.setAll(cart, !!val, { immediateSave: true });
-  }
-
-  /**
-   * Backward-compatible wrapper for old GridListeners code.
-   * @param {string} id
-   * @param {boolean} included
-   * @param {object} [opts]
-   * @returns {boolean}
-   */
-  toggleInclude(id, included, opts = {}) {
-    const c = this.ctx;
-    const key = this._normalizeIdKey(id);
-    const item = typeof c?._getCartItemById === 'function' ? c._getCartItemById(key) : null;
-
-    const changed = this.set(key, !!included, { immediateSave: !!opts.immediateSave, reason: 'toggleInclude' });
-    if (item) item.included = !!included;
-
-    return changed;
-  }
-
-  saveIncludedStatesToLocalStorage(immediate = false) {
+  saveFromCtxCart(immediate = false) {
     const c = this.ctx;
     const cart = Array.isArray(c?.cart) ? c.cart : [];
     this.syncFromItems(cart, !!immediate);
   }
 
-  loadIncludedStatesFromLocalStorage() {
+  /**
+   * Convenience: load map from storage and project onto ctx.cart.
+   */
+  loadToCtxCart() {
     const c = this.ctx;
     const cart = Array.isArray(c?.cart) ? c.cart : [];
     return this.applyToItems(cart);

@@ -1,0 +1,204 @@
+/* =========================
+   Mobile bottom blocks (base)
+   ========================= */
+
+:root{
+  /* Theme tokens (можно переопределять на уровне темы/страницы) */
+  --mbb-bg: #ff7200;
+  --mbb-text: #fff;
+
+  --mbb-radius: 14px;
+  --mbb-pad: 14px;
+  --mbb-gap: 10px;
+
+  /* Button tokens */
+  --btn-radius: 14px;
+  --btn-font-size: 16px;
+  --btn-font-weight: 650;
+  --btn-pad-y: 12px;
+  --btn-pad-x: 14px;
+
+  /* Primary / Secondary colors */
+  --btn-primary-bg: var(--button-primary, #1f6feb);
+  --btn-primary-bg-hover: var(--accent-700, #1557c0);
+  --btn-primary-text: #fff;
+
+  --btn-secondary-bg: var(--button-secondary, rgba(255,255,255,.18));
+  --btn-secondary-bg-hover: rgba(255,255,255,.26);
+  --btn-secondary-text: #fff;
+
+  /* Disabled */
+  --btn-disabled-opacity: .55;
+  --btn-disabled-filter: saturate(.9);
+
+  /* Shadow */
+  --mbb-shadow: 0 -10px 30px rgba(0,0,0,.18);
+}
+
+/* Блок-обертка для любых мобильных нижних панелей */
+.mobileBottomBlock{
+  background: var(--mbb-bg);
+  color: var(--mbb-text);
+
+  border-radius: var(--mbb-radius) var(--mbb-radius) 0 0;
+  box-shadow: var(--mbb-shadow);
+
+  padding: var(--mbb-pad);
+  padding-bottom: calc(var(--mbb-pad) + env(safe-area-inset-bottom, 0px));
+
+  /* sticky bottom */
+  position: sticky;
+  bottom: 0;
+  z-index: 60;
+}
+
+/* Чтобы якоря/кнопки не наследовали странные стили */
+.mobileBottomBlock a{
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ====== Checkout block layout ====== */
+
+.mobileBottomBlock .btn-checkout{
+  display: block;
+  border-radius: var(--btn-radius);
+  overflow: hidden;
+}
+
+.mobileBottomBlock .btn-checkout > ul{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mbb-gap);
+
+  /* чтобы контент не прыгал */
+  min-height: 44px;
+}
+
+.mobileBottomBlock .btn-checkout > ul > li{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.mobileBottomBlock .mobileProducts{
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  opacity: .95;
+}
+
+.mobileBottomBlock .mobilePrice{
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  font-weight: 750;
+}
+
+.mobileBottomBlock #mobileProductCount{
+  margin: 0;
+  font-weight: 800;
+}
+
+/* =========================
+   Buttons (base + variants)
+   ========================= */
+
+/* Базовая кнопка — общий стиль без дублирования */
+.mobileBottomBlock .btn{
+  -webkit-tap-highlight-color: transparent;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  width: 100%;
+  min-height: 44px;
+
+  padding: var(--btn-pad-y) var(--btn-pad-x);
+  border-radius: var(--btn-radius);
+  border: 1px solid transparent;
+
+  font-size: var(--btn-font-size);
+  font-weight: var(--btn-font-weight);
+  line-height: 1;
+
+  cursor: pointer;
+  user-select: none;
+
+  transform: translateZ(0);
+  transition: transform .12s ease, background .18s ease, border-color .18s ease, opacity .18s ease, filter .18s ease;
+}
+
+/* Primary */
+.mobileBottomBlock .btn-primary{
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-color: rgba(255,255,255,.12);
+}
+
+.mobileBottomBlock .btn ul {
+	display: contents;
+}
+
+/* Secondary */
+.mobileBottomBlock .btn-secondary{
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border-color: rgba(255,255,255,.22);
+}
+
+/* Hover/Active only for devices that support hover */
+@media (hover:hover) and (pointer:fine){
+  .mobileBottomBlock .btn-primary:hover{
+    background: var(--btn-primary-bg-hover);
+    transform: translateY(-1px);
+  }
+  .mobileBottomBlock .btn-secondary:hover{
+    background: var(--btn-secondary-bg-hover);
+    transform: translateY(-1px);
+  }
+}
+
+.mobileBottomBlock .btn:active{
+  transform: translateY(0);
+}
+
+/* Disabled: единообразно для всех кнопок */
+.mobileBottomBlock .btn:disabled,
+.mobileBottomBlock .btn.is-disabled,
+.mobileBottomBlock .btn.disabled{
+  opacity: var(--btn-disabled-opacity);
+  filter: var(--btn-disabled-filter);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =========================
+   Product actions bar layout
+   ========================= */
+
+.mobileBottomBlock .mobileProductActions__inner{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mbb-gap);
+}
+
+/* Если нужно сделать primary шире */
+.mobileBottomBlock .mobileProductActions__inner.is-primary-wide{
+  grid-template-columns: 1.3fr .7fr;
+}
+
+/* =========================
+   Reduced motion
+   ========================= */
+@media (prefers-reduced-motion: reduce){
+  .mobileBottomBlock .btn{
+    transition: none;
+  }
+}

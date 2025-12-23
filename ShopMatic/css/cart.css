@@ -134,8 +134,11 @@ Author: Calista Verner
     display: block;
 }
 .cart-item__details.mobile li {
- 
 display: inline-flex;
+}
+
+.cart-item__details.mobile .cart-itemSpecs {
+	display: none;
 }
 
  .cart-item__details ul {
@@ -195,34 +198,6 @@ display: inline-flex;
      font-family: 'FSElliotPro-Heavy', var(--font-sans);
      font-weight: 800;
      font-size: 12pt;
-}
-
-.mobileCheckout {
-	background: #ff7200;
-	border-radius: 10px 10px 0px 0px;
-	padding: 15px;
-	color: white;
-	text-align: center;
-}
-
-.mobileCheckout > a {
-	border-radius: 15px;
-}
-
-.mobileCheckout ul > li {
-display: inline-flex;
-}
-
-.mobileCheckout .mobileProducts {
-float: inline-start;
-}
-
-.mobileCheckout .mobilePrice {
-float: inline-end;
-}
-
-.mobileCheckout #mobileProductCount {
-	margin: 0 5px;
 }
 
  .cart-item .cart-item__controls {
@@ -405,27 +380,6 @@ font-weight: bolder;
      font-size: 18px;
      margin-left: 4px;
      color: var(--text-secondary);
-}
-/* Checkout button */
- .btn-checkout {
-     background: var(--button-primary);
-     color: #fff;
-     border: none;
-     border-radius: 15px;
-     padding: 14px 15px 10px;
-     display: block;
-     font-size: 16px;
-     font-weight: 600;
-     cursor: pointer;
-     transition: background .2s ease, transform .1s ease;
-}
-.btn-checkout.disabled {
-	opacity: 0.6;
-	cursor:not-allowed;
-}
- .btn-checkout:hover {
-     background: var(--accent-700);
-     transform: translateY(-1px);
 }
  .cart-grid .cart-itemSpecs > .specsBlock {
      width: max-content;

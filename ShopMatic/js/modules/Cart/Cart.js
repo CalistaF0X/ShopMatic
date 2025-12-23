@@ -1,4 +1,5 @@
 import { CartUI } from './CartUI.js';
+import { Events } from '../Events.js';
 
 /**
  * CartModule
@@ -38,7 +39,10 @@ export class CartModule extends CartUI {
 
   _emitCartChanged(payload) {
     const bus = this._bus();
-    try { bus?.emit?.('cart:changed', payload); } catch {}
+    // canonical
+    try { bus?.emit?.(Events.DOMAIN_CART_CHANGED, payload); } catch {}
+    // legacy alias
+    try { bus?.emit?.(Events.LEGACY_CART_CHANGED, payload); } catch {}
   }
 
   add(productId, qty = 1) {
@@ -94,11 +98,11 @@ export class CartModule extends CartUI {
     await super.loadFromStorage();
     const uiRes = this.updateCartUI();
 
-    // If we can get ids from storage/cart list — emit ids.
-    // Otherwise emit global hint (Card will fallback to selector query per id only when needed).
     try {
       const arr = this.getCartArray?.() || this.storage?.loadCart?.() || [];
-      const ids = Array.isArray(arr) ? arr.map((x) => String(x?.id ?? x?.name ?? x?.productId ?? '').trim()).filter(Boolean) : [];
+      const ids = Array.isArray(arr)
+        ? arr.map((x) => String(x?.id ?? x?.name ?? x?.productId ?? '').trim()).filter(Boolean)
+        : [];
       if (ids.length) this._emitCartChanged({ ids, action: 'load' });
       else this._emitCartChanged({ action: 'load' });
     } catch {
@@ -109,7 +113,6 @@ export class CartModule extends CartUI {
   }
 
   clear() {
-    // try to snapshot ids before clear for point refresh
     let ids = [];
     try {
       const arr = this.getCartArray?.() || [];

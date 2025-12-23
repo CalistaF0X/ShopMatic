@@ -1,5 +1,5 @@
 // ProductPage/ProductPageController.js
-
+import { MobileProductActionsBar } from "./MobileProductActionsBar.js";
 export class ProductPageController {
   constructor(context, view) {
     this.ctx = context;
@@ -108,7 +108,18 @@ export class ProductPageController {
         .forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     });
+	
+	this.mobileActions = new MobileProductActionsBar(this.ctx, {
+	  breakpointPx: 768,
+	  footerSelector: '.menu__content',
+	  isProductRoute: (hash) => String(hash || '').includes('product'),
+	  // если у тебя есть источник id:
+	  getProductId: () => this.view.currentProductId // или this.product?.id
+	});
 
+	this.mobileActions.bind(document.body);
+	this.ctx.currentProductId = this.view.currentProductId; // чтобы bar мог забрать id
+	this.mobileActions.refresh();
     window.addEventListener('cart:updated', this._bound.onCartUpdated);
 
     try {

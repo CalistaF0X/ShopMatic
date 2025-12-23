@@ -1,5 +1,5 @@
 // Renderer/CardRenderer.js
-import { BaseRenderer } from '../BaseRenderer.js';
+import { BaseRenderer } from '../../BaseRenderer.js';
 
 /**
  * VerticalCardRenderer

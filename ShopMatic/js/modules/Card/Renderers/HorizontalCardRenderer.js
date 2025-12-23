@@ -1,5 +1,5 @@
 // Renderer/CartRenderer.js
-import { BaseRenderer } from '../BaseRenderer.js';
+import { BaseRenderer } from '../../BaseRenderer.js';
 
 /**
  * Renders and updates horizontal cart rows (supports per-item include checkbox).
@@ -342,9 +342,11 @@ _updateRowDom(row, data = {}) {
   }
 
   async createCard(item = {}) {
+    // Modern contract: createCard returns a DOM Element.
     const data = this._normalizeCartItem(item);
-    return await this.renderTemplate('cardHorizontal', data);
+    return await this._createRowFromData(data);
   }
+
 
   async renderListHorizontal(cartEl, cartArr = [], options = {}) {
     if (!cartEl) return;

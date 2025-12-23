@@ -3,6 +3,9 @@
  *
  * GridListeners — DOM -> intents only.
  * NO business logic.
+ *
+ * Senior polish:
+ *  - uses 'input' for qty to react immediately (no blur required)
  */
 export class GridListeners {
   constructor(ctx) {
@@ -22,8 +25,8 @@ export class GridListeners {
     c._gridInputHandler = (ev) => this.handleGridInput(ev);
 
     try {
-      c.cartGrid.addEventListener('click', c._gridHandler);
-      c.cartGrid.addEventListener('change', c._gridInputHandler);
+      c.cartGrid.addEventListener('click', c._gridHandler, { passive: false });
+      c.cartGrid.addEventListener('input', c._gridInputHandler, { passive: true }); // was 'change'
       c._gridListenersAttachedTo = c.cartGrid;
     } catch (e) {
       c._logError('_attachGridListeners failed', e);
@@ -35,7 +38,7 @@ export class GridListeners {
     if (!c._gridListenersAttachedTo) return;
     try {
       c._gridListenersAttachedTo.removeEventListener('click', c._gridHandler);
-      c._gridListenersAttachedTo.removeEventListener('change', c._gridInputHandler);
+      c._gridListenersAttachedTo.removeEventListener('input', c._gridInputHandler);
     } catch (e) {
       c._logError('_detachGridListeners error', e);
     }
@@ -69,7 +72,6 @@ export class GridListeners {
 
     if (closest('.qty-btn.qty-decr, [data-action="qty-decr"], [data-role="qty-minus"]')) {
       ev.preventDefault();
-      // minus never blocked; allow reaching 0
       c.presenter.dispatch({ type: 'QTY_DEC', id, sourceRow: row });
       return;
     }
@@ -86,12 +88,13 @@ export class GridListeners {
     if (!input) return;
 
     // qty input
-    if (
-      input.matches &&
-      (input.matches('.qty-input') ||
-        input.matches('[data-role="qty-input"]') ||
-        input.matches('input[type="number"]'))
-    ) {
+    const isQty =
+      (input.matches &&
+        (input.matches('.qty-input') ||
+          input.matches('[data-role="qty-input"]') ||
+          input.matches('input[type="number"]')));
+
+    if (isQty) {
       const row = c.rowSync.findRowFromElement(input);
       if (!row) return;
 
